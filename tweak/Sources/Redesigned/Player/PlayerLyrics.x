@@ -816,9 +816,11 @@ static void replace(void) {
 // Lines kept for the track playing, or the look for them over with none. The glyph is told only when they
 // are here, since SGRPlayerLyricsChanged sets the animated artwork's blur each time.
 - (void)linesKept:(NSNotification *)note {
-    if (![note.object isEqual:SGKaraokePlayingTrack()]) return;
-    if (SGRPlayerLyricsAvailable()) SGRPlayerLyricsChanged();
-    else [self closeIfNone];
+    if (SGRPlayerLyricsAvailable()) {
+        SGRPlayerLyricsChanged();
+        return;
+    }
+    if ([note.object isEqual:SGKaraokePlayingTrack()]) [self closeIfNone];
 }
 
 // The lines go once the grace is over and nothing is looking for the track's own any more.
@@ -842,6 +844,12 @@ static void replace(void) {
     _track = track;
     _graceOver = NO;
     SGRPlayerLyricsChanged();
+    // Playback state and the lyrics cache can publish a track on adjacent callbacks.
+    for (NSNumber *wait in @[@0.25, @1]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(wait.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if ([self->_track isEqualToString:track]) SGRPlayerLyricsChanged();
+        });
+    }
     // The lines already up wait out a grace for the new track's before they go, a track after it its own.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kLyricsGrace * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         if (![self->_track isEqualToString:track]) return;

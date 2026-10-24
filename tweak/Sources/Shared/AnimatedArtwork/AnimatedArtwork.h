@@ -26,6 +26,7 @@ typedef NS_ENUM(NSInteger, SGLockArtwork) {
 SGLockArtwork SGLockScreenArtwork(void);
 NSArray<NSString *> *SGLockScreenStarViewOrder(void);
 void SGLockScreenStarAdvanceView(void);
+SGLockArtwork SGLockScreenSkipUnavailableMotion(void);
 CGFloat SGLockScreenCoverArtworkScale(void);
 BOOL SGLockScreenCanvasLyricsEnabled(void);
 void SGLockScreenCanvasLyricsSetEnabled(BOOL enabled);

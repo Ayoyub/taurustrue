@@ -1,5 +1,5 @@
-// What the lock screen fills the screen with, the lyrics' style and whether the downloads run in Low Data
-// Mode. iOS 26 and up only.
+// The lock screen's ordered artwork views and whether moving-artwork downloads run in Low Data Mode.
+// iOS 26 and up only.
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
@@ -19,21 +19,90 @@ static NSArray<NSString *> *defaultStarViewOrder(void) {
     return @[kStarCanvas, kStarCanvasLyrics, kStarFill, kStarColorful, kStarDefault];
 }
 
+static BOOL starViewOrderContains(NSString *key) {
+    return [SGLockScreenStarViewOrder() containsObject:key];
+}
+
+static NSString *starViewName(NSString *key) {
+    if ([key isEqualToString:kStarCanvas]) return @"Canvas";
+    if ([key isEqualToString:kStarCanvasLyrics]) return @"Canvas with lyrics";
+    if ([key isEqualToString:kStarFill]) return @"Fill";
+    if ([key isEqualToString:kStarColorful]) return @"Colourful";
+    return @"Default";
+}
+
+static NSString *starViewForArtwork(SGLockArtwork artwork, BOOL canvasLyrics) {
+    if (artwork == SGLockArtworkOff) return kStarDefault;
+    if (artwork == SGLockArtworkEverySong) return kStarColorful;
+    if (artwork == SGLockArtworkFill) return kStarFill;
+    if (artwork == SGLockArtworkLyrics) return kStarCanvasLyrics;
+    if (SGLockArtworkHasMotion(artwork)) return canvasLyrics ? kStarCanvasLyrics : kStarCanvas;
+    return nil;
+}
+
+static SGLockArtwork artworkForStarView(NSString *view) {
+    if ([view isEqualToString:kStarDefault]) return SGLockArtworkOff;
+    if ([view isEqualToString:kStarColorful]) return SGLockArtworkEverySong;
+    if ([view isEqualToString:kStarFill]) return SGLockArtworkFill;
+    return SGLockArtworkMotion;
+}
+
+static void selectStarView(NSString *view) {
+    if ([view isEqualToString:kStarDefault]) {
+        SGSetInt(SGKeyFullScreenArtwork, SGLockArtworkOff);
+        SGLockScreenCanvasLyricsSetEnabled(NO);
+    } else if ([view isEqualToString:kStarColorful]) {
+        SGSetInt(SGKeyFullScreenArtwork, SGLockArtworkEverySong);
+        SGLockScreenCanvasLyricsSetEnabled(NO);
+    } else if ([view isEqualToString:kStarFill]) {
+        SGSetInt(SGKeyFullScreenArtwork, SGLockArtworkFill);
+        SGLockScreenCanvasLyricsSetEnabled(NO);
+    } else if ([view isEqualToString:kStarCanvas] || [view isEqualToString:kStarCanvasLyrics]) {
+        SGSetInt(SGKeyFullScreenArtwork, SGLockArtworkMotion);
+        SGLockScreenCanvasLyricsSetEnabled([view isEqualToString:kStarCanvasLyrics]);
+    }
+}
+
 SGLockArtwork SGLockScreenArtwork(void) {
     if (@available(iOS 26.0, *)) {
-        // The old switch's YES and NO read as Moving artwork and Off, the enum's first two.
         static dispatch_once_t once;
         dispatch_once(&once, ^{
             NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
+            BOOL hadSelection = store.objectForKey(SGKeyFullScreenArtwork) != nil
+                || store.objectForKey(SGKeyLockScreenMotion) != nil
+                || store.objectForKey(SGKeyLegacyLockScreenArtwork) != nil;
             SGMigrateKey(SGKeyLockScreenMotion, SGKeyFullScreenArtwork);
             SGMigrateKey(SGKeyLegacyLockScreenArtwork, SGKeyFullScreenArtwork);
             if (![store objectForKey:SGKeyFullScreenArtwork]) {
                 SGSetInt(SGKeyFullScreenArtwork, SGFlag(SGKeyLegacyLockScreenArtwork, YES)
                          ? SGLockArtworkMotion : SGLockArtworkOff);
             }
+            NSInteger stored = SGInt(SGKeyFullScreenArtwork, SGLockArtworkOff);
+            if (stored == SGLockArtworkLyrics) {
+                SGSetInt(SGKeyFullScreenArtwork, SGLockArtworkMotion);
+                SGLockScreenCanvasLyricsSetEnabled(YES);
+            }
             if (![store objectForKey:SGKeyMotionSources] && [store objectForKey:SGKeyLockScreenArtworkSources]) {
                 NSArray<NSString *> *legacy = SGArtworkOrder();
                 if (legacy.count) [store setObject:legacy forKey:SGKeyMotionSources];
+            }
+            NSArray<NSString *> *order = SGLockScreenStarViewOrder();
+            if (order.count) {
+                if (hadSelection) {
+                    NSString *previous = starViewForArtwork((SGLockArtwork)stored,
+                        stored == SGLockArtworkLyrics || SGLockScreenCanvasLyricsEnabled());
+                    if (!SGHidden(SGKeyLockScreenStar) && previous && ![order.firstObject isEqualToString:previous]) {
+                        NSMutableArray *reordered = [order mutableCopy];
+                        [reordered removeObject:previous];
+                        [reordered insertObject:previous atIndex:0];
+                        [store setObject:reordered forKey:SGKeyLockScreenStarViews];
+                        order = reordered;
+                    }
+                }
+                NSString *selected = starViewForArtwork((SGLockArtwork)SGInt(SGKeyFullScreenArtwork, SGLockArtworkOff),
+                    SGLockScreenCanvasLyricsEnabled());
+                if (!SGHidden(SGKeyLockScreenStar) || !selected || ![order containsObject:selected])
+                    selectStarView(order.firstObject);
             }
         });
         return (SGLockArtwork)SGInt(SGKeyFullScreenArtwork, SGLockArtworkOff);
@@ -61,34 +130,35 @@ NSArray<NSString *> *SGLockScreenStarViewOrder(void) {
         [NSUserDefaults.standardUserDefaults setObject:order forKey:SGKeyLockScreenStarViews];
         SGSetEnabled(kStarViewsMigrated, YES);
     }
+    if (!order.count) return defaultStarViewOrder();
     return order;
 }
 
 void SGLockScreenStarAdvanceView(void) {
     NSArray<NSString *> *order = SGLockScreenStarViewOrder();
     if (!order.count) return;
-    SGLockArtwork artwork = SGLockScreenArtwork();
-    NSString *current = artwork == SGLockArtworkOff ? kStarDefault
-        : artwork == SGLockArtworkEverySong ? kStarColorful
-        : artwork == SGLockArtworkFill ? kStarFill
-        : SGLockArtworkHasMotion(artwork) ? (SGLockScreenCanvasLyricsEnabled() ? kStarCanvasLyrics : kStarCanvas)
-        : nil;
+    NSString *current = starViewForArtwork(SGLockScreenArtwork(), SGLockScreenCanvasLyricsEnabled());
     NSUInteger index = current ? [order indexOfObject:current] : NSNotFound;
     NSString *next = order[index == NSNotFound ? 0 : (index + 1) % order.count];
-    if ([next isEqualToString:kStarDefault]) {
-        SGSetInt(SGKeyFullScreenArtwork, SGLockArtworkOff);
-        SGLockScreenCanvasLyricsSetEnabled(NO);
-    } else if ([next isEqualToString:kStarColorful]) {
-        SGSetInt(SGKeyFullScreenArtwork, SGLockArtworkEverySong);
-        SGLockScreenCanvasLyricsSetEnabled(NO);
-    } else if ([next isEqualToString:kStarFill]) {
-        SGSetInt(SGKeyFullScreenArtwork, SGLockArtworkFill);
-        SGLockScreenCanvasLyricsSetEnabled(NO);
-    } else {
-        SGSetInt(SGKeyFullScreenArtwork, SGLockArtworkMotion);
-        SGLockScreenCanvasLyricsSetEnabled([next isEqualToString:kStarCanvasLyrics]);
-    }
+    selectStarView(next);
     SGLog(@"lock star: switched to %@", next);
+}
+
+SGLockArtwork SGLockScreenSkipUnavailableMotion(void) {
+    NSArray<NSString *> *order = SGLockScreenStarViewOrder();
+    BOOL cycling = SGHidden(SGKeyLockScreenStar) && order.count > 1;
+    NSString *current = starViewForArtwork(SGLockScreenArtwork(), SGLockScreenCanvasLyricsEnabled());
+    NSUInteger index = current ? [order indexOfObject:current] : NSNotFound;
+    for (NSUInteger step = 1; step <= order.count; step++) {
+        NSString *next = order[index == NSNotFound ? step - 1 : (index + step) % order.count];
+        if ([next isEqualToString:kStarCanvas] || [next isEqualToString:kStarCanvasLyrics]) continue;
+        if (cycling) selectStarView(next);
+        SGLog(@"lock motion: no animated source; skipped to %@", next);
+        return artworkForStarView(next);
+    }
+    if (cycling) selectStarView(kStarDefault);
+    SGLog(@"lock motion: no animated source or non-motion view is enabled; using iOS default artwork");
+    return SGLockArtworkOff;
 }
 
 BOOL SGLockScreenCanvasLyricsEnabled(void) {
@@ -137,39 +207,35 @@ NSArray *SGLockScreenMotionRows(void) {
         SGLockScreenArtwork();   // moves the old switch over before the row reads the new key
         SGModRow *style = SGChoiceRow(@"Lyrics style", @"Still draws each line once; Animated breathes the cover behind it",
                                       SGKeyLockScreenLyricsStyle, @[@"Still", @"Animated"], 0);
-        style.visible = ^BOOL { return SGLockScreenArtwork() == SGLockArtworkLyrics; };
-        SGModRow *canvasLyrics = SGOptionRow(@"Canvas lyrics", @"Show synced lines over the moving artwork",
-                                             SGKeyLockScreenCanvasLyrics);
-        canvasLyrics.changed = ^(BOOL on) { SGLockScreenCanvasLyricsSetEnabled(on); };
-        canvasLyrics.visible = ^BOOL { return SGLockScreenArtwork() == SGLockArtworkMotion; };
+        style.visible = ^BOOL { return starViewOrderContains(kStarCanvasLyrics); };
         SGModRow *exclusiveLyrics = SGSwitchRow(@"Automatically switch lyric styles",
             @"Turn off artist-name lyrics when Canvas lyrics turn on, and vice versa", SGKeyLockScreenExclusiveLyrics);
         exclusiveLyrics.changed = ^(BOOL on) { SGLockScreenLyricsExclusivityChanged(on); };
         SGModRow *star = SGOptionRow(@"Switch with the star", @"Cycle through the ordered lock-screen artwork views",
                                      SGKeyLockScreenStar);
+        star.changed = ^(BOOL on) {
+            if (!on) {
+                NSArray<NSString *> *order = SGLockScreenStarViewOrder();
+                if (order.count) selectStarView(order.firstObject);
+            }
+        };
         SGModRow *starViews = SGLockScreenStarViewsRow();
-        starViews.visible = ^BOOL { return SGHidden(SGKeyLockScreenStar); };
         SGModRow *lowData = SGOptionRow(@"Download in Low Data Mode", @"Moving artwork, up to about 7 MB a song", SGKeyMotionLowData);
-        lowData.visible = ^BOOL { return SGLockScreenArtwork() == SGLockArtworkMotion; };
+        lowData.visible = ^BOOL { return starViewOrderContains(kStarCanvas) || starViewOrderContains(kStarCanvasLyrics); };
         SGModRow *coverSize = SGSliderRow(@"Fallback album art size",
             @"Every song's colourful cover-and-blur treatment, even when Canvas or animated covers are available",
             0.25, 0.85, 0.05,
             ^double { return SGLockScreenCoverArtworkScale(); },
             ^(double value) { SGSetInt(SGKeyLockScreenCoverArtworkScale, (NSInteger)lround(value * 100)); },
             ^NSString *(double value) { return [NSString stringWithFormat:@"%.0f%%", value * 100]; });
-        coverSize.visible = ^BOOL { return SGLockScreenArtwork() == SGLockArtworkEverySong; };
+        coverSize.visible = ^BOOL { return starViewOrderContains(kStarColorful); };
         SGModRow *sources = SGMotionSourcesRow();
         sources.visible = lowData.visible;
         return @[
-            SGChoiceRow(@"Full-screen artwork", @"Moving artwork uses Canvas or Apple Music's animated cover; Lyrics shows synced lines. "
-                                                 @"Every song always uses the colourful cover-and-blur look. "
-                                                 @"Fill uses a sharp cover fading into progressively blurred artwork.",
-                        SGKeyFullScreenArtwork, @[@"Off", @"Moving artwork", @"Lyrics", @"Every song", @"Fill"], SGLockArtworkOff),
+            starViews,
             style,
-            canvasLyrics,
             exclusiveLyrics,
             star,
-            starViews,
             sources,
             lowData,
             coverSize,
@@ -179,7 +245,7 @@ NSArray *SGLockScreenMotionRows(void) {
 }
 
 SGModRow *SGLockScreenStarViewsRow(void) {
-    SGModRow *row = SGPageRow(@"Lock-screen star views", ^UIViewController *{
+    SGModRow *row = SGPageRow(@"Full-screen artwork", ^UIViewController *{
         NSArray<SGSource *> *views = @[
             [SGSource sourceWithKey:kStarCanvas name:@"Canvas" detail:@"The track's Canvas or its Apple Music animated cover"],
             [SGSource sourceWithKey:kStarCanvasLyrics name:@"Canvas with lyrics" detail:@"Synced lyrics over the moving artwork"],
@@ -187,20 +253,27 @@ SGModRow *SGLockScreenStarViewsRow(void) {
             [SGSource sourceWithKey:kStarColorful name:@"Colourful" detail:@"Every Song: the custom moving-cover look, without source animations"],
             [SGSource sourceWithKey:kStarDefault name:@"Default" detail:@"iOS's full album artwork without an animated layer"],
         ];
-        return SGSourcesPageMake(@"Lock-screen star views",
-            @"Drag to choose the cycle order. Move a view below the line to disable it.",
+        return SGSourcesPageMakeWithMinimumOnCount(@"Full-screen artwork",
+            @"Drag to choose the order. The first available view is used when star cycling is off. Move a view below the line to disable it; keep at least one enabled.",
             views, ^NSArray<NSString *> *{ return SGLockScreenStarViewOrder(); },
             ^(NSArray<NSString *> *keys) {
-                [NSUserDefaults.standardUserDefaults setObject:keys forKey:SGKeyLockScreenStarViews];
-            });
+                NSArray<NSString *> *order = keys.count ? keys : @[kStarDefault];
+                [NSUserDefaults.standardUserDefaults setObject:order forKey:SGKeyLockScreenStarViews];
+                if (!SGHidden(SGKeyLockScreenStar) || ![order containsObject:starViewForArtwork(SGLockScreenArtwork(), SGLockScreenCanvasLyricsEnabled())])
+                    selectStarView(order.firstObject);
+            }, 1);
     });
     row.value = ^NSString * {
         NSArray<NSString *> *current = SGLockScreenStarViewOrder();
-        if (!current.count) return @"Off";
-        NSString *first = [current.firstObject isEqualToString:kStarCanvas] ? @"Canvas"
-            : [current.firstObject isEqualToString:kStarCanvasLyrics] ? @"Canvas with lyrics"
-            : [current.firstObject isEqualToString:kStarFill] ? @"Fill"
-            : [current.firstObject isEqualToString:kStarColorful] ? @"Colourful" : @"Default";
+        if (!current.count) return @"Default";
+        if (SGHidden(SGKeyLockScreenStar) && current.count > 1) {
+            NSString *selected = starViewForArtwork(SGLockScreenArtwork(), SGLockScreenCanvasLyricsEnabled());
+            NSUInteger index = selected ? [current indexOfObject:selected] : NSNotFound;
+            if (index != NSNotFound)
+                return [NSString stringWithFormat:@"%@ (%lu/%lu)", starViewName(selected),
+                        (unsigned long)index + 1, (unsigned long)current.count];
+        }
+        NSString *first = starViewName(current.firstObject);
         return current.count == 1 ? first : [NSString stringWithFormat:@"%@ +%lu", first, (unsigned long)current.count - 1];
     };
     return SGWithSymbol(row, @"arrow.trianglehead.2.clockwise.rotate.90");
