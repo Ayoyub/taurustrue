@@ -25,6 +25,9 @@ typedef NS_ENUM(NSInteger, SGLockArtwork) {
 // Off below iOS 26, which has no animated artwork on the lock screen.
 SGLockArtwork SGLockScreenArtwork(void);
 NSArray<NSString *> *SGLockScreenStarViewOrder(void);
+NSString *SGLockScreenCurrentStarView(void);
+NSString *SGLockScreenStarViewName(NSString *view);
+void SGLockScreenStarSelectView(NSString *view);
 void SGLockScreenStarAdvanceView(void);
 SGLockArtwork SGLockScreenSkipUnavailableMotion(void);
 CGFloat SGLockScreenCoverArtworkScale(void);

@@ -108,17 +108,17 @@ Shared:
                   for it and the next, and the player's card-loading timeout flag is forced to its 5 s maximum while a
                   source is on
     LockScreenLyrics/ the artist-name replacement in system Now Playing, and the full-screen lyric clips,
-                       drawn over the moving artwork when Canvas lyrics is on
+                       shown as the standalone Lyrics style over blurred cover artwork
     LockScreenArtwork/ the track's Canvas or its album's Apple Music cover as the lock screen's animated
                   artwork, from iOS 26 (Apple takes an MPMediaItemAnimatedArtwork under one of
                   MPNowPlayingInfoCenter's animated artwork keys, and the mod puts one there through a second
                   hook on setNowPlayingInfo:, so the lock screen artwork and lyric clips' rewrites of the same dictionary carry
-                  it). With Canvas lyrics on, each lyric clip is composited over the moving video; Fill
+                  it). Lyrics does not require an animated source; each line is composited over blurred cover
+                  artwork. Fill
                   generates a clip with a sharp cover fading into four progressive blur layers. The player
-                  menu toggles Canvas lyrics; the lock-screen star cycles through its configured views,
-                  independently of the artist-name setting.
-                  The Canvas lyrics switch stays visible even while full-screen artwork is off. The star can
-                  cycle through Canvas, Canvas with lyrics and Fill; its order and enabled views are configurable.
+                  menu selects the current lock-screen style; the lock-screen star cycles through its configured views.
+                  The star can
+                  cycle through Canvas, Lyrics, Fill, Colourful and Default; its order and enabled views are configurable.
                   In Every song mode, Fallback album art size controls the square cover shown over the blurred
                   fallback when no moving artwork or lyrics clip is available; 50% is the original size.
                   The sources are asked in the user's order (Spotify Canvas, then Apple Music until set, on the
@@ -360,17 +360,17 @@ switches, the six background styles (Still, Colors, Fluid, Animated, Visualiser 
 choice (Still, Colors, Fluid, Visualiser or Fill, default Fill), background opacity sliders for the artwork
 and each player blur layer, and its volume controls.
 Lyrics: the ordered list of lyrics sources, lyrics for every track,
-naming the source in the redesign, artist-name replacement on the lock screen (independent of Canvas lyrics),
+naming the source in the redesign, artist-name replacement on the lock screen,
 and glass lyrics in the native look; in the redesign also
 which of the lyrics, their pronunciation and their translation is set largest, Genius meaning marks (which can
 be hidden without losing the hold-on-a-line meaning sheet), and the translation's language. Player controls
 include independent portrait and landscape auto-hide switches for the lyrics screen. Lock Screen: its controls and, under Artwork,
-Animated lock screen, the track's Canvas or the album's Apple Music cover played behind the lock screen's controls,
-with optional Canvas lyrics toggled from the redesigned player's ⋯ menu or the lock-screen star, a Sources page for
-their order, Fill artwork, and configurable lock-screen star cycling across Canvas, Canvas with lyrics, Fill,
+the full-screen style selector, the track's Canvas or the album's Apple Music cover played behind the lock screen's controls,
+Lyrics over the blurred cover without requiring Canvas, a Sources page for the animated-artwork order, Fill artwork,
+and configurable lock-screen star cycling across Canvas, Lyrics, Fill,
 Colourful (Every Song's moving-cover fallback) and Default (iOS's full album artwork); a missing animation
-advances to the next ordered view. A "Needs iOS 26" row appears below that;
-Canvas lyrics and artist-name replacement remain independent.
+advances to the next ordered view. The redesigned player's ⋯ menu also selects the active lock-screen style.
+A "Needs iOS 26" row appears below that; artist-name and lock-screen lyrics can be kept exclusive by the setting.
 Audio effects follows Lock Screen, which appears between Lyrics and Audio effects on the root page.
 In the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
@@ -403,7 +403,7 @@ blocking and the telemetry blocking have stopped) and Labs (features Spotify bui
 AI Chat (Martini) first). Last, All flags, Spotify's remote-config flags with a search field and an
 Auto / Off / On control per flag (a text field for the number and text ones), and Mod: Updates
 (the row reads out where the build stands and opens the changelog of everything newer than it, read
-from the releases Release Please cuts, with Check now, the release to get, all the releases and Tell
+from published releases, with Check now, the release to get, all the releases and Tell
 me when one is out, the sheet a newer release brings up a few seconds after Spotify opens), the
 build and Spotify's version, the site and the repo, the welcome tour again and Reset all
 settings. A flag switch on a page forces that one flag and off leaves Spotify's own value, so the All

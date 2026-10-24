@@ -11,8 +11,7 @@
 //
 // The choice is read on every track, and a change applies at once: Off takes the clip away, Moving artwork
 // and Every song look the playing track up, and Fill makes a generated sharp-to-blurred cover clip.
-// Lyrics is LyricsArtwork.x's, which reads it only at launch, so a launch with Lyrics leaves this off until
-// the next one.
+// Lyrics is drawn by LyricsArtwork.x; this follower stops looking for motion while that style is selected.
 #import <MediaPlayer/MediaPlayer.h>
 #import "Core/SGCore.h"
 #import "AnimatedArtwork.h"
@@ -254,7 +253,7 @@ void SGLockMotionShowPlain(BOOL plain) {
                 sg_lyricsFile = file;
                 SGLyricsArtworkSetMotion(uri, file);
                 SGLockMotionShowPlain(sg_plain);
-                if (!file) SGLog(@"lock motion: no animated source; Canvas lyrics will use the blurred cover");
+                if (!file) SGLog(@"lock motion: no animated source; lock-screen lyrics will use the blurred cover");
             } else if (file) {
                 show(file);
             } else if (motionOn(sg_choice)) {
@@ -272,7 +271,7 @@ void SGLockMotionShowPlain(BOOL plain) {
                 BOOL modeChanged = choice != sg_configuredChoice || lyrics != canvasLyrics;
                 BOOL scaleChanged = newCoverScale != coverScale;
                 if (!modeChanged && !scaleChanged) return;
-                SGLog(@"lock motion: artwork mode, Canvas lyrics or fallback cover size changed");
+                SGLog(@"lock motion: artwork mode, lock-screen lyrics or fallback cover size changed");
                 sg_choice = choice;
                 sg_configuredChoice = choice;
                 canvasLyrics = lyrics;

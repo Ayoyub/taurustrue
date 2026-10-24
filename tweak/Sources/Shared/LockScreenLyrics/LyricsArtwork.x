@@ -353,7 +353,7 @@ static void setTicking(BOOL on) {
                 if (SGLockScreenArtwork() == choice && enabled == canvasLyrics) return;
                 choice = SGLockScreenArtwork();
                 canvasLyrics = enabled;
-                SGLog(@"lock lyrics: artwork mode or Canvas lyrics changed");
+                SGLog(@"lock lyrics: artwork mode or lyrics overlay changed");
                 [observer playerStateDidChange:SGPlayerState()];
             });
         }];
