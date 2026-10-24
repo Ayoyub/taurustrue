@@ -254,7 +254,7 @@ void SGLockMotionShowPlain(BOOL plain) {
                 sg_lyricsFile = file;
                 SGLyricsArtworkSetMotion(uri, file);
                 SGLockMotionShowPlain(sg_plain);
-                if (!file) advanceAfterMissingMotion();
+                if (!file) SGLog(@"lock motion: no animated source; Canvas lyrics will use the blurred cover");
             } else if (file) {
                 show(file);
             } else if (motionOn(sg_choice)) {
