@@ -68,9 +68,9 @@ SGLockArtwork SGLockScreenArtwork(void) {
         static dispatch_once_t once;
         dispatch_once(&once, ^{
             NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
-            BOOL hadSelection = store.objectForKey(SGKeyFullScreenArtwork) != nil
-                || store.objectForKey(SGKeyLockScreenMotion) != nil
-                || store.objectForKey(SGKeyLegacyLockScreenArtwork) != nil;
+            BOOL hadSelection = [store objectForKey:SGKeyFullScreenArtwork] != nil
+                || [store objectForKey:SGKeyLockScreenMotion] != nil
+                || [store objectForKey:SGKeyLegacyLockScreenArtwork] != nil;
             SGMigrateKey(SGKeyLockScreenMotion, SGKeyFullScreenArtwork);
             SGMigrateKey(SGKeyLegacyLockScreenArtwork, SGKeyFullScreenArtwork);
             if (![store objectForKey:SGKeyFullScreenArtwork]) {
