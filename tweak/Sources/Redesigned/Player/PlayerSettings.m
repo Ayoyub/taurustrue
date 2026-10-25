@@ -29,6 +29,8 @@
 #import "Redesigned/Kit/SGRFluid.h"
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
+#import "Shared/Lyrics/Lyrics.h"
+#import "Shared/LyricsSources/LyricsSources.h"
 #import "Shared/Player/SGLastTrack.h"
 #import "Player.h"
 
@@ -395,6 +397,32 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
         [weakShowcase reloadBackgroundAnimated:NO];
         [weakPage.tableView reloadData];
     };
+    NSArray<SGLyricsProvider *> *providers = SGLyricsAllProviders();
+    NSMutableArray<NSString *> *lyricsSourceNames = [NSMutableArray arrayWithObject:@"Automatic"];
+    for (SGLyricsProvider *provider in providers) [lyricsSourceNames addObject:provider.name];
+    SGModRow *lyricsBlur = SGMenuRow(@"Lyrics background blur", @[@"On", @"Off"], ^NSString *{
+        return SGRPlayerMotionLyricsBlurEnabled() ? @"On" : @"Off";
+    }, ^(NSInteger index) {
+        SGRPlayerMotionSetLyricsBlurEnabled(index == 0);
+    });
+    lyricsBlur.visible = ^BOOL { return SGKaraokePlayingTrack().length > 0; };
+    SGModRow *lyricsSource = SGMenuRow(@"Lyrics source", lyricsSourceNames, ^NSString *{
+        NSString *key = SGLyricsProviderForTrack(SGKaraokePlayingTrack());
+        SGLyricsProvider *provider = SGLyricsProviderFor(key);
+        return provider.name ?: @"Automatic";
+    }, ^(NSInteger index) {
+        NSString *track = SGKaraokePlayingTrack();
+        if (!track.length) {
+            SGLog(@"redesign player: cannot change lyrics source without a playing track");
+            return;
+        }
+        NSString *key = nil;
+        if (index > 0 && (NSUInteger)index <= providers.count) key = providers[(NSUInteger)index - 1].key;
+        SGKaraokeSetProviderForTrack(track, key);
+        SGRPlayerLyricsChanged();
+        [weakPage.tableView reloadData];
+    });
+    lyricsSource.visible = lyricsBlur.visible;
     SGModRow *reset = SGActionRow(@"Reset", nil, ^{
         SGRResetFluidSettings();
         [weakPage.tableView reloadData];   // the sliders at once, rather than at the page's next tick
@@ -428,6 +456,8 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     ];
 
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObjects:
+        SGNotedSection(@"This song", @[lyricsBlur, lyricsSource],
+                       @"Lyrics blur and source are remembered separately for each song."),
         SGSection(nil, @[animatedFallback, sources, lowData]),
         SGNotedSection(nil, fluid, @"Brightness above 100% can make white text harder to read. A paused song holds the "
                     @"background still. Animated and Visualiser use these where they show Fluid."),

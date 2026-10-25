@@ -131,6 +131,9 @@ static CGFloat brightEnd(NSData *luminances) {
 - (void)setBlurred:(BOOL)blurred animated:(BOOL)animated;
 @end
 
+static BOOL lyricsBlurEnabledForTrack(NSString *track);
+static NSString *currentLyricsBlurTrack(void);
+
 @implementation SGRPlayerMotionView {
     AVQueuePlayer *_player;
     AVPlayerLooper *_looper;
@@ -236,6 +239,10 @@ static UIViewPropertyAnimator *setBlurIntensity(UIVisualEffectView *view, UIView
 }
 
 - (void)playerStateDidChange:(SPTPlayerState *)state {
+    NSString *track = SGURIString(state.track.URI) ?: currentLyricsBlurTrack();
+    BOOL blurred = SGRPlayerLyricsOpen() && lyricsBlurEnabledForTrack(track);
+    [self setBlurred:blurred animated:self.window != nil];
+    [SGRPlayerField() setLyricsBlurred:blurred animated:self.window != nil];
     [self updateMotion];
 }
 
@@ -703,10 +710,10 @@ static void show(NSString *track, NSURL *file) {
 }
 
 void SGRPlayerMotionLyricsChanged(void) {
-    [sg_motion setBlurred:SGRPlayerLyricsOpen() && lyricsBlurEnabledForTrack(currentLyricsBlurTrack())
-                 animated:sg_motion.window != nil];
+    BOOL blurred = SGRPlayerLyricsOpen() && lyricsBlurEnabledForTrack(currentLyricsBlurTrack());
+    [sg_motion setBlurred:blurred animated:sg_motion.window != nil];
     SGRArtworkField *field = SGRPlayerField();
-    [field setLyricsBlurred:SGRPlayerLyricsOpen() animated:field.window != nil];
+    [field setLyricsBlurred:blurred animated:field.window != nil];
     SGRPlayerLyricsBlurControlRefresh();
 }
 

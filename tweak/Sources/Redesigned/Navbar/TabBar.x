@@ -569,11 +569,14 @@ static const NSUInteger kFadeStops = 7;
 
 - (void)setFadeVisible:(BOOL)visible {
     _fade.hidden = !visible;
+    _fade.opacity = visible ? 1 : 0;
 }
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    _fade.hidden = !SGFlag(SGRKeyNavbarBottomGradient, YES);
+    BOOL visible = SGFlag(SGRKeyNavbarBottomGradient, YES);
+    _fade.hidden = !visible;
+    _fade.opacity = visible ? 1 : 0;
     CGRect bounds = self.bounds;
     CGRect fade = CGRectMake(0, -kFadeRise, bounds.size.width, bounds.size.height + kFadeRise);
     if (!CGRectEqualToRect(_fade.frame, fade)) _fade.frame = fade;
@@ -594,7 +597,10 @@ static const NSUInteger kFadeStops = 7;
 
 void SGRSetTabBarGradientVisible(BOOL visible) {
     UIView *host = objc_getAssociatedObject(sg_stockBar, &kHostKey);
-    if ([host isKindOfClass:SGRTabBarHost.class]) [(SGRTabBarHost *)host setFadeVisible:visible];
+    if ([host isKindOfClass:SGRTabBarHost.class]) {
+        [(SGRTabBarHost *)host setFadeVisible:visible];
+        [host setNeedsLayout];
+    }
 }
 
 @interface SGRHomeHold : UILongPressGestureRecognizer

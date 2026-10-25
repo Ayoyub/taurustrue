@@ -25,6 +25,7 @@ static const NSUInteger kKeptTracks = 40;
 static NSString *const kLegacyMusixmatch = @"spotifyglass.musixmatchLyrics";
 static NSString *const kLegacyAllTracks = @"spotifyglass.musixmatchAllTracks";
 static NSString *const kLegacyNetEase = @"spotifyglass.neteaseWordTiming";
+static NSString *const kTrackProvidersKey = @"spotifyglass.lyrics.trackProviders";
 
 @implementation SGLyricsLink
 @end
@@ -286,6 +287,7 @@ static NSMutableDictionary<NSString *, NSString *> *sg_credits;
 // Spotify's own has_lyrics per track, as its metadata said. The player's metadata is read many
 // times a second while a list scrolls, so a value already noted costs one lookup and no write.
 static NSMutableDictionary<NSString *, NSNumber *> *sg_spotifyHas;
+static NSMutableDictionary<NSString *, NSNumber *> *sg_generation;
 static const NSUInteger kNotedTracks = 200;
 
 static void setUp(void) {
@@ -296,7 +298,40 @@ static void setUp(void) {
         sg_missing = [NSMutableSet set];
         sg_credits = [NSMutableDictionary dictionary];
         sg_spotifyHas = [NSMutableDictionary dictionary];
+        sg_generation = [NSMutableDictionary dictionary];
     });
+}
+
+NSString *SGLyricsProviderForTrack(NSString *trackID) {
+    if (!trackID.length) return nil;
+    NSString *key = [NSUserDefaults.standardUserDefaults dictionaryForKey:kTrackProvidersKey][trackID];
+    return SGLyricsProviderFor(key) ? key : nil;
+}
+
+void SGLyricsForgetTrack(NSString *trackID) {
+    if (!trackID.length) return;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        setUp();
+        sg_generation[trackID] = @(sg_generation[trackID].unsignedIntegerValue + 1);
+        [sg_kept removeObjectForKey:trackID];
+        [sg_missing removeObject:trackID];
+        [sg_waiting removeObjectForKey:trackID];
+    });
+}
+
+void SGLyricsSetProviderForTrack(NSString *trackID, NSString *providerKey) {
+    if (!trackID.length || (providerKey.length && !SGLyricsProviderFor(providerKey))) {
+        SGLog(@"lyrics: ignored invalid per-track source for %@", trackID ?: @"(no track)");
+        return;
+    }
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    NSMutableDictionary<NSString *, NSString *> *providers = [[defaults dictionaryForKey:kTrackProvidersKey] mutableCopy]
+        ?: [NSMutableDictionary dictionary];
+    if (providerKey.length) providers[trackID] = providerKey;
+    else [providers removeObjectForKey:trackID];
+    if (providers.count) [defaults setObject:providers forKey:kTrackProvidersKey];
+    else [defaults removeObjectForKey:kTrackProvidersKey];
+    SGLyricsForgetTrack(trackID);
 }
 
 // Whether the source's lines are better than what the walk already has: any lines beat none, and
@@ -380,6 +415,7 @@ void SGLyricsOpenCreditLinks(NSArray<SGLyricsLink *> *links, UIView *from) {
 @interface SGLyricsWalk : NSObject
 @property (nonatomic, copy) NSArray<NSString *> *order;
 @property (nonatomic) NSUInteger index;
+@property (nonatomic) NSUInteger generation;
 @property (nonatomic, strong) SGLyricsQuery *query;
 @property (nonatomic, strong) SGLyricsResult *merged;
 // Sources that needed a name the query did not have when their turn came.
@@ -394,6 +430,7 @@ void SGLyricsOpenCreditLinks(NSArray<SGLyricsLink *> *links, UIView *from) {
 // Musixmatch's community translations are not waited for here: the lines take them as they are kept
 // for the lyrics view (Shared/Lyrics/KaraokeSource.x), whichever source won, Spotify included.
 static void finish(SGLyricsWalk *walk) {
+    if (walk.generation != sg_generation[walk.query.trackID].unsignedIntegerValue) return;
     SGLyricsQuery *query = walk.query;
     SGLyricsResult *merged = walk.merged;
     NSString *trackID = query.trackID;
@@ -426,6 +463,7 @@ static void finish(SGLyricsWalk *walk) {
 }
 
 static void step(SGLyricsWalk *walk) {
+    if (walk.generation != sg_generation[walk.query.trackID].unsignedIntegerValue) return;
     SGLyricsQuery *query = walk.query;
     SGLyricsResult *merged = walk.merged;
     // A source higher in the order has answered with timed lyrics: that is the answer.
@@ -455,6 +493,7 @@ static void step(SGLyricsWalk *walk) {
         return;
     }
     provider.ask(query, ^(SGLyricsResult *fresh) {
+        if (walk.generation != sg_generation[query.trackID].unsignedIntegerValue) return;
         learnFrom(query, fresh);
         noteCredit(fresh);
         if (fresh.instrumental) {
@@ -481,10 +520,13 @@ static void step(SGLyricsWalk *walk) {
 }
 
 static void startWalk(NSString *trackID, SGLyricsQuery *query) {
+    NSString *selected = SGLyricsProviderForTrack(trackID);
+    NSArray<NSString *> *order = selected ? @[selected] : SGLyricsOrder();
     SGLog(@"lyrics: asking %@ for %@ as \"%@\" by \"%@\", album \"%@\", %lds",
-          [SGLyricsOrder() componentsJoinedByString:@", "], trackID, query.title, query.artist, query.album, (long)query.seconds);
+          [order componentsJoinedByString:@", "], trackID, query.title, query.artist, query.album, (long)query.seconds);
     SGLyricsWalk *walk = [SGLyricsWalk new];
-    walk.order = SGLyricsOrder();
+    walk.order = order;
+    walk.generation = sg_generation[trackID].unsignedIntegerValue;
     walk.query = query;
     walk.merged = [SGLyricsResult new];
     walk.passedOver = [NSMutableArray array];

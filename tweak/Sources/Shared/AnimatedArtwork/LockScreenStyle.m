@@ -133,6 +133,12 @@ void SGLockScreenStarAdvanceView(void) {
     NSArray<NSString *> *order = SGLockScreenStarViewOrder();
     if (!order.count) return;
     NSString *current = SGLockScreenCurrentStarView();
+    SGLockArtwork effective = SGLockScreenEffectiveArtwork();
+    if (current && [current isEqualToString:kStarCanvas] && effective != SGLockArtworkMotion) {
+        current = effective == SGLockArtworkLyrics ? kStarLyrics
+            : effective == SGLockArtworkFill ? kStarFill
+            : effective == SGLockArtworkEverySong ? kStarColorful : kStarDefault;
+    }
     NSUInteger index = current ? [order indexOfObject:current] : NSNotFound;
     NSString *next = order[index == NSNotFound ? 0 : (index + 1) % order.count];
     SGLockScreenStarSelectView(next);

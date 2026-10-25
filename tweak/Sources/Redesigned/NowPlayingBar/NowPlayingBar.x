@@ -11,7 +11,7 @@
 #import <objc/runtime.h>
 
 static const CGFloat kCardRadius = 24;
-static char kGlassKey, kProgressHeightKey;
+static char kGlassKey, kProgressHeightKey, kProgressTransformKey;
 static __weak UIVisualEffectView *sg_cardGlass;
 static __weak UIView *sg_cardArtwork;
 static __weak UIView *sg_cardContent;
@@ -79,20 +79,20 @@ static void restyleCardContent(UIView *card) {
         sg_cardArtwork = outer;
     });
     SGForEachView(card, ^(UIView *v) {
-        CGRect f = v.frame;
-        if (f.size.height > 3 || f.size.width < 200 || v.superview.bounds.size.height < 40) return;
+        CGSize size = v.bounds.size;
+        if (size.height <= 0 || size.height > 3 || size.width < 200 || v.superview.bounds.size.height < 40) return;
         NSNumber *originalHeight = objc_getAssociatedObject(v, &kProgressHeightKey);
         if (!originalHeight) {
-            // Keep Spotify's measured height so switching the option off restores the native line.
-            originalHeight = @(f.size.height);
+            originalHeight = @(size.height);
             objc_setAssociatedObject(v, &kProgressHeightKey, originalHeight, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            objc_setAssociatedObject(v, &kProgressTransformKey, [NSValue valueWithCGAffineTransform:v.transform], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
-        CGFloat height = SGFlag(SGRKeyNowPlayingThickProgress, NO) ? 2 : originalHeight.doubleValue;
-        CGRect target = CGRectMake(52, card.bounds.size.height - 6, 226, height);
-        if (CGRectEqualToRect(f, target)) return;
-        v.frame = target;
-        [v setNeedsLayout];
-        [v layoutIfNeeded];
+        NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+        CGFloat height = [defaults objectForKey:SGRKeyNowPlayingProgressThickness]
+            ? MIN(5, MAX(0, [defaults doubleForKey:SGRKeyNowPlayingProgressThickness])) : 2;
+        CGAffineTransform original = [objc_getAssociatedObject(v, &kProgressTransformKey) CGAffineTransformValue];
+        CGFloat scale = originalHeight.doubleValue > 0 ? height / originalHeight.doubleValue : 0;
+        v.transform = CGAffineTransformScale(original, 1, scale);
     });
 }
 

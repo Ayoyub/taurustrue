@@ -2,7 +2,7 @@
 
 #define SGRHideBarConnect @"spotifyglass.redesign.hide.barConnect"   // the device button on the card
 #define SGRKeyNowPlayingRoundedArtwork @"spotifyglass.redesign.nowPlayingBar.roundedArtwork"
-#define SGRKeyNowPlayingThickProgress @"spotifyglass.redesign.nowPlayingBar.thickProgress"
+#define SGRKeyNowPlayingProgressThickness @"spotifyglass.redesign.nowPlayingBar.progressThickness"
 
 @class SGModRow;
 
