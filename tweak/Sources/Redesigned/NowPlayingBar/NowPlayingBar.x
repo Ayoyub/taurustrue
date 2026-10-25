@@ -109,12 +109,10 @@ static CGFloat progressThickness(void) {
     [super layoutSubviews];
     CGFloat horizontalInset = 8;
     CGFloat width = MAX(0, self.bounds.size.width - horizontalInset * 2);
-    CGFloat trackHeight = MIN(1, self.bounds.size.height);
-    CGFloat trackY = self.bounds.size.height - 3 - trackHeight / 2;
-    _track.frame = CGRectMake(horizontalInset, trackY, width, trackHeight);
     CGFloat fillY = self.bounds.size.height - 3 - _thickness / 2;
+    _track.frame = CGRectMake(horizontalInset, fillY, width, _thickness);
     _fill.frame = CGRectMake(horizontalInset, fillY, width * _progress, _thickness);
-    _track.layer.cornerRadius = trackHeight / 2;
+    _track.layer.cornerRadius = _thickness / 2;
     _fill.layer.cornerRadius = _thickness / 2;
 }
 @end
