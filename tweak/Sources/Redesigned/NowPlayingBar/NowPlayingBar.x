@@ -107,22 +107,24 @@ static CGFloat progressThickness(void) {
 
 - (void)layoutSubviews {
     [super layoutSubviews];
+    CGFloat horizontalInset = 8;
+    CGFloat width = MAX(0, self.bounds.size.width - horizontalInset * 2);
     CGFloat trackHeight = MIN(1, self.bounds.size.height);
-    CGFloat trackY = (self.bounds.size.height - trackHeight) / 2;
-    _track.frame = CGRectMake(0, trackY, self.bounds.size.width, trackHeight);
-    CGFloat fillY = (self.bounds.size.height - _thickness) / 2;
-    _fill.frame = CGRectMake(0, fillY, self.bounds.size.width * _progress, _thickness);
+    CGFloat trackY = self.bounds.size.height - 3 - trackHeight / 2;
+    _track.frame = CGRectMake(horizontalInset, trackY, width, trackHeight);
+    CGFloat fillY = self.bounds.size.height - 3 - _thickness / 2;
+    _fill.frame = CGRectMake(horizontalInset, fillY, width * _progress, _thickness);
     _track.layer.cornerRadius = trackHeight / 2;
     _fill.layer.cornerRadius = _thickness / 2;
 }
 @end
 
 static BOOL isProgressLine(UIView *view, UIView *card) {
-    if (view == card || !view.superview || view.superview.bounds.size.height < 40) return NO;
+    if (view == card || !view.superview) return NO;
     CGSize size = view.bounds.size;
-    if (size.height <= 0 || size.height > 3 || size.width < MAX(200, card.bounds.size.width * 0.7)) return NO;
+    if (size.height <= 0 || size.height > 10 || size.width < MAX(200, card.bounds.size.width * 0.7)) return NO;
     CGRect frame = [view convertRect:view.bounds toView:card];
-    return CGRectGetMaxY(frame) >= card.bounds.size.height - 12;
+    return CGRectGetMaxY(frame) >= card.bounds.size.height - 14;
 }
 
 static void updateMiniProgress(void) {
@@ -166,7 +168,8 @@ static void ensureMiniProgress(UIView *card) {
     }
     if (progress.superview != card) [card addSubview:progress];
     [card bringSubviewToFront:progress];
-    progress.frame = CGRectMake(8, card.bounds.size.height - 6, MAX(0, card.bounds.size.width - 16), 5);
+    progress.frame = card.bounds;
+    progress.layer.cornerRadius = MIN(kCardRadius, card.bounds.size.height / 2);
     sg_miniProgressView = progress;
     updateMiniProgress();
     if (!sg_progressTimer) {

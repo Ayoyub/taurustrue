@@ -2535,7 +2535,8 @@
 > The redesign's now playing bar: the album-coloured card becomes a glass card with round artwork and an
 > independently drawn progress line under the text, whether or not Spotify's own line can be found. Spotify's
 > labels, buttons and gestures stay in place; its progress line is hidden only when found and is restored when
-> the full-screen player opens.
+> the full-screen player opens. The custom line sits at the card's bottom inside a full-card rounded clip, so it
+> cannot escape the curved corners.
 >
 > The full screen player morphs the bar's own card and artwork into the cover art. The bar was
 > written to hand itself back to Spotify for that animation, from NowPlaying_ViewPageImpl's
