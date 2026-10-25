@@ -99,16 +99,19 @@ static void applyProgressThickness(UIView *view, UIView *card) {
     CGFloat delta = desired - originalHeight.doubleValue;
     CGPoint originalCenter = [objc_getAssociatedObject(view, &kProgressCenterKey) CGPointValue];
     CGRect bounds = view.bounds;
-    bounds.size.height = desired;
-    view.bounds = bounds;
-    view.center = CGPointMake(originalCenter.x, originalCenter.y - delta / 2);
+    if (fabs(bounds.size.height - desired) >= 0.01) {
+        bounds.size.height = desired;
+        view.bounds = bounds;
+    }
+    CGPoint center = CGPointMake(originalCenter.x, originalCenter.y - delta / 2);
+    if (fabs(view.center.x - center.x) >= 0.01 || fabs(view.center.y - center.y) >= 0.01) view.center = center;
 
     for (UIView *ancestor = view.superview; ancestor; ancestor = ancestor.superview) {
         for (NSLayoutConstraint *constraint in ancestor.constraints) {
             if (constraint.firstItem == view && constraint.firstAttribute == NSLayoutAttributeHeight
                 && !constraint.secondItem && constraint.relation == NSLayoutRelationEqual
                 && fabs(constraint.multiplier - 1) < 0.001) {
-                constraint.constant = desired;
+                if (fabs(constraint.constant - desired) >= 0.01) constraint.constant = desired;
             }
         }
         if (ancestor == card) break;
@@ -147,6 +150,17 @@ static void restyleCardContent(UIView *card) {
         sg_loggedProgressMissing = YES;
     } else if (foundProgress) {
         sg_loggedProgressMissing = NO;
+    }
+}
+
+static void applyProgressThicknessAfterLayout(UIView *view) {
+    if (!objc_getAssociatedObject(view, &kProgressHeightKey)) return;
+    UIView *card = sg_cardContent;
+    for (UIView *ancestor = view; card && ancestor; ancestor = ancestor.superview) {
+        if (ancestor == card) {
+            applyProgressThickness(view, card);
+            return;
+        }
     }
 }
 
@@ -497,8 +511,8 @@ static void styleNowPlayingBar(UIViewController *container) {
     CGFloat radius = MIN(kCardRadius, frame.size.height / 2);
     if (card) {
         roundView(card, radius);
-        restyleCardContent(card);
     }
+    restyleCardContent(card ?: bar);
 
     UIVisualEffectView *glass = SGGlassFor(container.view, &kGlassKey);
     if (glass.overrideUserInterfaceStyle != UIUserInterfaceStyleDark) glass.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
@@ -528,6 +542,13 @@ static void styleNowPlayingBar(UIViewController *container) {
     %orig;
     UIViewController *parent = ((UIViewController *)self).parentViewController;
     if ([NSStringFromClass(parent.class) containsString:@"NowPlayingBarContainer"]) styleNowPlayingBar(parent);
+}
+%end
+
+%hook UIView
+- (void)layoutSubviews {
+    %orig;
+    applyProgressThicknessAfterLayout(self);
 }
 %end
 

@@ -89,7 +89,6 @@ void SGRPlayerShowLandscape(BOOL show);
 void SGRPlayerMotionLyricsChanged(void);
 BOOL SGRPlayerMotionLyricsBlurEnabled(void);
 void SGRPlayerMotionSetLyricsBlurEnabled(BOOL enabled);
-void SGRPlayerLyricsBlurControlRefresh(void);
 void SGRPlayerMotionFieldLaidOut(void);
 void SGRPlayerMotionCoverLaidOut(void);
 BOOL SGRPlayerMotionShowing(void);

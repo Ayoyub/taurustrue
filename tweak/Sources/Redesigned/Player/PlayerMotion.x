@@ -673,7 +673,6 @@ static void clear(BOOL animated) {
     SGRPlayerVisualiserUpdate();
     if (animated) [old disappear:^{ [old removeFromSuperview]; }];
     else [old removeFromSuperview];
-    SGRPlayerLyricsBlurControlRefresh();
 }
 
 static void show(NSString *track, NSURL *file) {
@@ -704,7 +703,6 @@ static void show(NSString *track, NSURL *file) {
             if (sg_motion == motion) cover(YES);
         }];
         setCoverShown(NO, animated);
-        SGRPlayerLyricsBlurControlRefresh();
         SGLog(@"redesign player: animated artwork %@, %.0fx%.0f", file.lastPathComponent, poster.size.width, poster.size.height);
     });
 }
@@ -714,7 +712,6 @@ void SGRPlayerMotionLyricsChanged(void) {
     [sg_motion setBlurred:blurred animated:sg_motion.window != nil];
     SGRArtworkField *field = SGRPlayerField();
     [field setLyricsBlurred:blurred animated:field.window != nil];
-    SGRPlayerLyricsBlurControlRefresh();
 }
 
 static void videoSurface(id unit, BOOL attached) {
@@ -737,7 +734,6 @@ static BOOL beginTrack(NSString *track) {
     sg_begun++;
     BOOL blurLyrics = SGRPlayerLyricsOpen() && lyricsBlurEnabledForTrack(track);
     [sg_motion setBlurred:blurLyrics animated:sg_motion.window != nil];
-    SGRPlayerLyricsBlurControlRefresh();
     // Read on every track, since the ⋯ menu switches it.
     BOOL wanted = SGRPlayerBackground() == SGRPlayerBackgroundAnimated && !videoShowing() && motionAllowed();
     if (wanted && [track isEqualToString:sg_shown]) return YES;
