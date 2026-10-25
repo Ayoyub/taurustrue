@@ -91,8 +91,6 @@ static void restyleCardContent(UIView *card) {
         CGRect target = CGRectMake(52, card.bounds.size.height - 6, 226, height);
         if (CGRectEqualToRect(f, target)) return;
         v.frame = target;
-        [v setNeedsLayout];
-        [v layoutIfNeeded];
     });
 }
 
