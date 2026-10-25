@@ -25,6 +25,7 @@ static MPRemoteCommandHandlerStatus tapped(void) {
 }
 
 static void arm(void) {
+    SGLockScreenStarEnsureView();
     static BOOL lastOn, lastActive;
     BOOL on = starOn(), active = on && [currentStarView() isEqualToString:@"lyrics"];
     if (sg_like && !sg_like.enabled) sg_like.enabled = YES;

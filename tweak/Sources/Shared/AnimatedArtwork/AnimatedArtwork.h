@@ -15,6 +15,7 @@
 #define SGKeyLockScreenStarViews @"spotifyglass.lockscreen.starViews"
 #define SGKeyLockScreenExclusiveLyrics @"spotifyglass.lockscreen.exclusiveLyrics"
 #define SGKeyLockScreenCoverArtworkScale @"spotifyglass.lockscreen.coverArtworkScale"
+#define SGNotificationLockScreenEffectiveArtworkChanged @"spotifyglass.lockscreen.effectiveArtworkChanged"
 typedef NS_ENUM(NSInteger, SGLockArtwork) {
     SGLockArtworkOff = 0,
     SGLockArtworkMotion,   // the Canvas, else Apple Music's animated cover (LockScreenMotion.x)
@@ -30,6 +31,10 @@ NSString *SGLockScreenStarViewName(NSString *view);
 void SGLockScreenStarSelectView(NSString *view);
 void SGLockScreenStarAdvanceView(void);
 SGLockArtwork SGLockScreenSkipUnavailableMotion(void);
+// With star switching on, an active view disabled by the user moves to the first enabled view.
+void SGLockScreenStarEnsureView(void);
+SGLockArtwork SGLockScreenEffectiveArtwork(void);
+void SGLockScreenSetEffectiveArtwork(SGLockArtwork artwork);
 CGFloat SGLockScreenCoverArtworkScale(void);
 BOOL SGLockScreenCanvasLyricsEnabled(void);
 void SGLockScreenCanvasLyricsSetEnabled(BOOL enabled);
@@ -83,7 +88,8 @@ void SGMotionClipFor(NSString *uri, NSURL *canvas, NSString *artist, NSString *a
 // state, as it does on a skip, where Spotify reports the track before its extended metadata, unless the clip
 // showing came from a source above Canvas. `begin` runs as a walk starts, to take the last clip off, and
 // says whether to walk at all; `found` gets the walk's clip, nil for none, and never runs for a walk a newer
-// one overtook. Once a walk has ended, the next track's clip is fetched ahead. Main queue.
+// one overtook. Changing the source order re-walks the current track. Once a walk has ended, the next
+// track's clip is fetched ahead. Main queue.
 @class SPTPlayerState;
 @interface SGMotionFollower : NSObject
 - (instancetype)initWithBegin:(BOOL (^)(NSString *uri, SPTPlayerState *state))begin

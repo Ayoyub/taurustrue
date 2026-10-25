@@ -9,9 +9,8 @@
 // lock screen asks for the video, and kept: the cut by the clip and shape, the cover's clip by the picture
 // the track names, so an album's songs share one.
 //
-// The choice is read on every track, and a change applies at once: Off takes the clip away, Moving artwork
-// and Every song look the playing track up, and Fill makes a generated sharp-to-blurred cover clip.
-// Lyrics is drawn by LyricsArtwork.x; this follower stops looking for motion while that style is selected.
+// The configured choice is read on every track. When Canvas is unavailable, the next enabled style is used
+// for that track only; the configured choice is retried on the next track.
 #import <MediaPlayer/MediaPlayer.h>
 #import "Core/SGCore.h"
 #import "AnimatedArtwork.h"
@@ -48,7 +47,6 @@ static void showFill(NSString *picture);
 API_AVAILABLE(ios(26.0))
 static void advanceAfterMissingMotion(void) {
     sg_choice = SGLockScreenSkipUnavailableMotion();
-    if (SGHidden(SGKeyLockScreenStar) && SGLockScreenStarViewOrder().count > 1) return;
     if (sg_choice == SGLockArtworkFill) showFill(sg_picture);
     else if (sg_choice == SGLockArtworkEverySong) showCover(sg_picture);
     else SGNowPlayingSetExtras(@"motion", nil, nil);
@@ -89,7 +87,11 @@ static void show(NSURL *file) {
     NSUInteger walk = sg_walk;
     NSString *title = sg_title;
     SGMotionPoster(file, ^(UIImage *poster) {
-        if (!poster || poster.size.height <= 0 || walk != sg_walk) return;
+        if (walk != sg_walk) return;
+        if (!poster || poster.size.width <= 0 || poster.size.height <= 0) {
+            advanceAfterMissingMotion();
+            return;
+        }
         CGFloat ratio;
         NSString *key = keyFor(poster.size, &ratio);
         if (!key) {
@@ -111,6 +113,9 @@ static void show(NSURL *file) {
                     SGLog(@"lock motion: %@ cut to %@ %@ in %.0f ms", file.lastPathComponent, ratio == 1 ? @"1:1" : @"3:4",
                           ok ? @"ready" : @"not written", (CFAbsoluteTimeGetCurrent() - start) * 1000);
                     completion(ok ? shaped : nil);
+                    if (!ok) dispatch_async(dispatch_get_main_queue(), ^{
+                        if (walk == sg_walk) advanceAfterMissingMotion();
+                    });
                 });
             }];
         SGNowPlayingSetExtras(@"motion", @{key: artwork}, title);
@@ -177,7 +182,7 @@ static void showFill(NSString *picture) {
     if (![MPNowPlayingInfoCenter.supportedAnimatedArtworkKeys containsObject:MPNowPlayingInfoProperty3x4AnimatedArtwork]) return;
     NSString *title = sg_title;
     CGSize size = SGLyricsClipSize(SGMotionPixels());
-    NSURL *file = SGMotionMadeFile([NSString stringWithFormat:@"fill\nv9\n%@\n%.0fx%.0f", picture, size.width, size.height]);
+    NSURL *file = SGMotionMadeFile([NSString stringWithFormat:@"fill\nv11\n%@\n%.0fx%.0f", picture, size.width, size.height]);
     __block UIImage *renderedFrame;
     MPMediaItemAnimatedArtwork *artwork = [[MPMediaItemAnimatedArtwork alloc] initWithArtworkID:file.lastPathComponent
         previewImageRequestHandler:^(CGSize wanted, void (^completion)(UIImage *)) {
@@ -226,10 +231,13 @@ void SGLockMotionShowPlain(BOOL plain) {
         sg_configuredChoice = sg_choice;
         sg_queue = dispatch_queue_create("spotifyglass.lockscreen.motion", DISPATCH_QUEUE_SERIAL);
         __block BOOL canvasLyrics = SGLockScreenCanvasLyricsEnabled();
+        __block NSArray<NSString *> *starViews = SGLockScreenStarViewOrder();
+        __block BOOL starEnabled = SGHidden(SGKeyLockScreenStar);
         __block CGFloat coverScale = SGLockScreenCoverArtworkScale();
         __block NSUInteger coverScaleRequest = 0;
         // Each walk takes the last one's clip off first, so the lock screen falls back to the still cover.
         sg_follower = [[SGMotionFollower alloc] initWithBegin:^BOOL(NSString *uri, SPTPlayerState *state) {
+            SGLockScreenStarEnsureView();
             sg_walk++;
             SGNowPlayingSetExtras(@"motion", nil, nil);
             sg_lyricsFile = nil;
@@ -239,6 +247,7 @@ void SGLockMotionShowPlain(BOOL plain) {
             sg_picture = pictureOf(state.track, metadata);
             sg_choice = SGLockScreenArtwork();
             sg_configuredChoice = sg_choice;
+            SGLockScreenSetEffectiveArtwork(sg_choice);
             if (sg_choice == SGLockArtworkFill) {
                 showFill(sg_picture);
                 return NO;
@@ -249,11 +258,10 @@ void SGLockMotionShowPlain(BOOL plain) {
             }
             return motionOn(sg_choice);
         } found:^(NSString *uri, NSURL *file) {
-            if (SGLockScreenCanvasLyricsEnabled() && motionOn(sg_choice)) {
+            if (file && SGLockScreenCanvasLyricsEnabled() && motionOn(sg_choice)) {
                 sg_lyricsFile = file;
                 SGLyricsArtworkSetMotion(uri, file);
                 SGLockMotionShowPlain(sg_plain);
-                if (!file) SGLog(@"lock motion: no animated source; lock-screen lyrics will use the blurred cover");
             } else if (file) {
                 show(file);
             } else if (motionOn(sg_choice)) {
@@ -265,16 +273,22 @@ void SGLockMotionShowPlain(BOOL plain) {
         [NSNotificationCenter.defaultCenter addObserverForName:NSUserDefaultsDidChangeNotification object:nil queue:nil
                                                     usingBlock:^(NSNotification *note) {
             dispatch_async(dispatch_get_main_queue(), ^{
+                SGLockScreenStarEnsureView();
                 SGLockArtwork choice = SGLockScreenArtwork();
                 BOOL lyrics = SGLockScreenCanvasLyricsEnabled();
+                NSArray<NSString *> *newStarViews = SGLockScreenStarViewOrder();
+                BOOL newStarEnabled = SGHidden(SGKeyLockScreenStar);
                 CGFloat newCoverScale = SGLockScreenCoverArtworkScale();
-                BOOL modeChanged = choice != sg_configuredChoice || lyrics != canvasLyrics;
+                BOOL modeChanged = choice != sg_configuredChoice || lyrics != canvasLyrics
+                    || ![starViews isEqualToArray:newStarViews] || starEnabled != newStarEnabled;
                 BOOL scaleChanged = newCoverScale != coverScale;
                 if (!modeChanged && !scaleChanged) return;
                 SGLog(@"lock motion: artwork mode, lock-screen lyrics or fallback cover size changed");
                 sg_choice = choice;
                 sg_configuredChoice = choice;
                 canvasLyrics = lyrics;
+                starViews = newStarViews;
+                starEnabled = newStarEnabled;
                 coverScale = newCoverScale;
                 if (modeChanged) {
                     coverScaleRequest++;

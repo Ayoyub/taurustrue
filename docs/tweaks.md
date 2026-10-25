@@ -355,6 +355,8 @@ voice model's download (Redesigned/Lyrics/SingSettings.m), with Off, On, No mode
 each with its own list of tabs. Player: Gestures and Blocked artists (with the count on the row), which work
 with either look. In the redesigned look Appearance holds the profile-photo toggle and accent colour;
 Home page style and the Top picks first-shelf size are independent switches.
+With Home page off, Top picks enlarges the first shelf without changing the feed's order or hiding its heading.
+Regular shelf headings, including Jump back in and Recently played, stay visible.
 The redesigned Player page also has independent Show Sing button and Show Translate button
 switches, the six background styles (Still, Colors, Fluid, Animated, Visualiser and Fill), an Animated fallback
 choice (Still, Colors, Fluid, Visualiser or Fill, default Fill), background opacity sliders for the artwork
@@ -364,12 +366,12 @@ naming the source in the redesign, artist-name replacement on the lock screen,
 and glass lyrics in the native look; in the redesign also
 which of the lyrics, their pronunciation and their translation is set largest, Genius meaning marks (which can
 be hidden without losing the hold-on-a-line meaning sheet), and the translation's language. Player controls
-include independent portrait and landscape auto-hide switches for the lyrics screen. Lock Screen: its controls and, under Artwork,
-the full-screen style selector, the track's Canvas or the album's Apple Music cover played behind the lock screen's controls,
-Lyrics over the blurred cover without requiring Canvas, a Sources page for the animated-artwork order, Fill artwork,
-and configurable lock-screen star cycling across Canvas, Lyrics, Fill,
-Colourful (Every Song's moving-cover fallback) and Default (iOS's full album artwork); a missing animation
-advances to the next ordered view. The redesigned player's ⋯ menu also selects the active lock-screen style.
+include independent portrait and landscape auto-hide switches for the lyrics screen. Lock Screen: its controls and, under Artwork, the full-screen style selector and ordered style hierarchy:
+Canvas (the track's Canvas or the album's Apple Music animated cover), Lyrics over the blurred cover,
+Fill artwork, Colourful (Every Song's moving-cover treatment), and Default (iOS's full album artwork).
+The first enabled style is used when star cycling is off; the star can cycle through enabled styles.
+If Canvas has no usable animation, the next enabled style is used for that track only, and Canvas is
+checked again on the next track. The redesigned player's ⋯ menu also selects the active lock-screen style.
 A "Needs iOS 26" row appears below that; artist-name and lock-screen lyrics can be kept exclusive by the setting.
 Audio effects follows Lock Screen, which appears between Lyrics and Audio effects on the root page.
 In the native look also Now playing bar (its device button and its flags), Queue & devices, and
