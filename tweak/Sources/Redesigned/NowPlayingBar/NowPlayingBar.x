@@ -128,11 +128,13 @@ static BOOL isProgressLine(UIView *view, UIView *card) {
 static void updateMiniProgress(void) {
     UIView *line = sg_progressLine;
     UIView *custom = sg_miniProgressView;
-    if (!line || !custom) return;
-    BOOL inMiniBar = SGIsInside(line, sgr_nowPlayingRoot);
-    BOOL transitioning = !inMiniBar || SGPlayerTransitionEnds() > 0;
-    NSNumber *originalAlpha = objc_getAssociatedObject(line, &kProgressAlphaKey);
-    if (originalAlpha) line.alpha = transitioning ? originalAlpha.doubleValue : 0;
+    if (!custom) return;
+    BOOL transitioning = !SGIsInside(custom, sgr_nowPlayingRoot) || SGPlayerTransitionEnds() > 0;
+    if (line) {
+        NSNumber *originalAlpha = objc_getAssociatedObject(line, &kProgressAlphaKey);
+        BOOL hideOriginal = !transitioning && SGIsInside(line, sgr_nowPlayingRoot);
+        if (originalAlpha) line.alpha = hideOriginal ? 0 : originalAlpha.doubleValue;
+    }
     custom.hidden = transitioning || progressThickness() <= 0;
     if (transitioning) return;
 
@@ -147,14 +149,13 @@ static void ensureMiniProgress(UIView *card) {
     SGForEachView(card, ^(UIView *view) {
         if (!line && isProgressLine(view, card)) line = view;
     });
-    if (!line) return;
 
     if (sg_progressLine && sg_progressLine != line) {
         NSNumber *oldAlpha = objc_getAssociatedObject(sg_progressLine, &kProgressAlphaKey);
         if (oldAlpha) sg_progressLine.alpha = oldAlpha.doubleValue;
     }
     sg_progressLine = line;
-    if (!objc_getAssociatedObject(line, &kProgressAlphaKey)) {
+    if (line && !objc_getAssociatedObject(line, &kProgressAlphaKey)) {
         objc_setAssociatedObject(line, &kProgressAlphaKey, @(line.alpha), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 

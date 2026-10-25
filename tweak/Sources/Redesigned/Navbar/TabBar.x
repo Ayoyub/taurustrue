@@ -596,11 +596,15 @@ static const NSUInteger kFadeStops = 7;
 @end
 
 void SGRSetTabBarGradientVisible(BOOL visible) {
-    UIView *host = objc_getAssociatedObject(sg_stockBar, &kHostKey);
+    UIView *stockBar = sg_stockBar;
+    if (stockBar) syncBar(stockBar);
+    UIView *host = objc_getAssociatedObject(stockBar, &kHostKey);
     if ([host isKindOfClass:SGRTabBarHost.class]) {
         [(SGRTabBarHost *)host setFadeVisible:visible];
         [host setNeedsLayout];
+        [host layoutIfNeeded];
     }
+    SGRRefreshTabBar();
 }
 
 @interface SGRHomeHold : UILongPressGestureRecognizer
