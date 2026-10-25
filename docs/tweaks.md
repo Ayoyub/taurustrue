@@ -230,11 +230,11 @@ Redesigned:
     Player/       the redesigned full screen player (Player.h lists its files); its ⋯ opens a menu the way the
                   Music app draws one (PlayerMenu.x, SGRPlayerMenu.m): a pane of glass grown out of the button,
                   Add to playlist, Add to Queue and Share as three tiles across its top, groups of rows under
-                  them, Speed and pitch opening onto Shared/Player's sliders in place, then the star-marked Canvas
-                  Lyrics switch and Background Style's six choices (Still, Colors, Fluid, Animated, Visualiser and Fill),
-                  everything else Spotify
-                  offers under More, and Remove from this playlist last in red. What is in it and what each row
-                  does stay Spotify's: its own sheet still opens, out of sight, and the menu is read off its
+                  them, Speed and pitch opening onto Shared/Player's sliders in place, then Lock Screen Style,
+                  Background Style's six choices (Still, Colors, Fluid, Animated, Visualiser and Fill), per-song
+                  Lyrics Background Blur and Lyrics Source choices, everything else Spotify
+                  offers under More, and Remove from this playlist last in red. Spotify's rows stay Spotify's:
+                  its own sheet still opens, out of sight, and the menu is read off its
                   table, each row placed by the number Spotify's ListRow carries as its identifier and fired
                   through that ListRow; a page Spotify pushes onto the sheet (Share's destinations) shows the
                   sheet, and a sheet with no rows within 4 s is shown as it is. It opens on the rows the last
@@ -247,9 +247,10 @@ Redesigned:
                   user choose Still, Colors, Fluid, Visualiser or Fill, with Fill as the default, for when Canvas is
                   unavailable or cannot play.
                   Player settings expose separate opacity sliders for its artwork and Canvas/lyrics blur layers.
-                  While lyrics are open over Animated, a control in the lyrics view toggles that track's background blur;
-                  it is on by default and remembered per track. The Mini player section also has an optional thicker
-                  progress line, off by default, beside its rounded-square album art option.
+                  While lyrics are open over Animated, background blur is on by default and remembered per track;
+                  the Player settings and ⋯ menu control it, alongside the per-song lyrics source. The Mini player
+                  section has its own independently drawn progress line with a 0–5 pt thickness slider (2 pt by default), beside its
+                  rounded-square album art option; it does not resize or reuse the full-screen player's progress bar.
                   Always on in the redesign.
                   Tested in the simulator against harness/playermenu/
                   With Sing on and its voice model downloaded (Mod Settings > Karaoke, Redesigned/Lyrics/SingSettings.m,
@@ -362,8 +363,8 @@ With Home page off, Top picks enlarges the first shelf without changing the feed
 Regular shelf headings, including Jump back in and Recently played, stay visible.
 The redesigned Player page also has independent Show Sing button and Show Translate button
 switches, the six background styles (Still, Colors, Fluid, Animated, Visualiser and Fill), an Animated fallback
-choice (Still, Colors, Fluid, Visualiser or Fill, default Fill), background opacity sliders for the artwork
-and each player blur layer, and its volume controls.
+choice (Still, Colors, Fluid, Visualiser or Fill, default Fill), per-song lyrics blur and lyrics-source choices,
+background opacity sliders for the artwork and each player blur layer, and its volume controls.
 Lyrics: the ordered list of lyrics sources, lyrics for every track,
 naming the source in the redesign, artist-name replacement on the lock screen,
 and glass lyrics in the native look; in the redesign also
@@ -381,8 +382,10 @@ In the native look also Now playing bar (its device button and its flags), Queue
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
 buttons to hide); in the redesign the Player page's Mini player section groups the device button, moving
-background, mini-player merge/transition toggle and rounded-square artwork option for both the card and
-docked pill, the latter off by default.
+background, mini-player merge/transition toggle, rounded-square artwork option for both the card and
+docked pill, and a 0–5 pt progress-bar thickness slider (2 pt by default).
+The Mod page's Clear cached files action removes only named tweak caches; it leaves Spotify downloads,
+Spotify-owned caches, imported lyrics and settings untouched.
 An optional volume slider is off by default, with its thumb hidden if enabled. The taurus settings page
 credits @Pulse-Ice for the Fill background treatment adapted from EeveeImmersive.
 Vibrations follows under either look, a card for

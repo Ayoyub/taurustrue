@@ -81,6 +81,10 @@ SGLyricsProvider *SGLyricsProviderFor(NSString *key);
 // Spotify's own lyrics alone.
 NSArray<NSString *> *SGLyricsOrder(void);
 void SGLyricsSetOrder(NSArray<NSString *> *keys);
+// A per-track source override; nil means use the user's ordered source list.
+NSString *SGLyricsProviderForTrack(NSString *trackID);
+void SGLyricsSetProviderForTrack(NSString *trackID, NSString *providerKey);
+void SGLyricsForgetTrack(NSString *trackID);
 BOOL SGLyricsEnabled(void);   // any source at all is on
 
 // Asks the sources in order and merges what they give, on the main queue. nil when none had lyrics.

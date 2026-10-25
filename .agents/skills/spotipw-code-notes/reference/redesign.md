@@ -2532,8 +2532,11 @@
 ## `Redesigned/NowPlayingBar/NowPlayingBar.x`
 
 **file overview** (was L1)
-> The redesign's now playing bar: the album-coloured card becomes a glass card with round artwork and the
-> progress line under the text. Spotify's own labels, buttons and gestures stay in place.
+> The redesign's now playing bar: the album-coloured card becomes a glass card with round artwork and an
+> independently drawn progress line under the text, whether or not Spotify's own line can be found. Spotify's
+> labels, buttons and gestures stay in place; its progress line is hidden only when found and is restored when
+> the full-screen player opens. The custom line sits at the card's bottom inside a full-card rounded clip, so it
+> cannot escape the curved corners.
 >
 > The full screen player morphs the bar's own card and artwork into the cover art. The bar was
 > written to hand itself back to Spotify for that animation, from NowPlaying_ViewPageImpl's
@@ -2868,6 +2871,9 @@
 > elements inside them, and it is undone before the player closes: the bar morphs back into a full
 > size cover, which a thumbnail would not match.
 >
+> The lyrics background blur is controlled by the per-song Player setting and the player's ⋯ menu;
+> there is no blur toggle over the cover.
+>
 > With the lines up and the song playing, the controls go after a few seconds untouched and the lines
 > have the player to themselves, the way the Music app leaves its lyrics alone: the header row, the
 > thumbnail and the bottom stack (the lifted title row with it) fade out, and the lines' room grows
@@ -3036,6 +3042,10 @@
 > didSelectRowAtIndexPath: -- so a row is fired through its ListRow (SGRActivate), as a tap would. Only the
 > cells on screen exist, and the hidden table is as short as the sheet would have been, so it is made tall
 > enough for all of them for the moment they are read or a row is fired, and put back.
+>
+> **The mod's own rows** are added after Spotify's: Speed and pitch, Lock Screen Style, Background Style,
+> then Lyrics Background Blur and Lyrics Source. The lyrics choices apply to the currently playing song;
+> blur is on by default, and choosing a source refreshes that song's lyrics.
 >
 > **What Spotify then does** is what it always does: it dismisses the sheet and acts (the card goes with the
 > sheet), or pushes a page of its own onto the sheet (Share's destinations, a list of artists) -- the sheet

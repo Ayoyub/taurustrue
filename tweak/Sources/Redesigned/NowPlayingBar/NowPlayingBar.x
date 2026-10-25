@@ -5,20 +5,24 @@
 #import "Redesigned/Navbar/Navbar.h"
 #import "Shared/Lyrics/Lyrics.h"
 #import "Shared/Player/NowPlayingExtras.h"
+#import "Shared/Player/PlayerEvents.h"
 #import "Shared/Player/PlayerState.h"
 #import "NowPlayingBar.h"
 #import <objc/message.h>
 #import <objc/runtime.h>
 
 static const CGFloat kCardRadius = 24;
-static char kGlassKey, kProgressHeightKey;
+static char kGlassKey, kProgressViewKey, kProgressAlphaKey;
 static __weak UIVisualEffectView *sg_cardGlass;
 static __weak UIView *sg_cardArtwork;
 static __weak UIView *sg_cardContent;
+static __weak UIView *sg_progressLine;
+static __weak UIView *sg_miniProgressView;
 static __weak UIViewController *sg_container;
 static BOOL sg_docked;
 static CGRect sg_dockRow;   // window coordinates
 static __weak UIView *sg_dockHost;
+static NSTimer *sg_progressTimer;
 
 CGRect SGRNowPlayingCardFrameIn(UIView *host, CGFloat *radius) {
     UIVisualEffectView *glass = sg_cardGlass;
@@ -63,7 +67,119 @@ static void roundView(UIView *view, CGFloat radius) {
     view.layer.cornerCurve = kCACornerCurveContinuous;
 }
 
+static CGFloat progressThickness(void) {
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    return [defaults objectForKey:SGRKeyNowPlayingProgressThickness]
+        ? MIN(5, MAX(0, [defaults doubleForKey:SGRKeyNowPlayingProgressThickness])) : 2;
+}
+
+@interface SGRMiniProgressView : UIView
+- (void)setProgress:(CGFloat)progress thickness:(CGFloat)thickness;
+@end
+
+@implementation SGRMiniProgressView {
+    UIView *_track;
+    UIView *_fill;
+    CGFloat _progress;
+    CGFloat _thickness;
+}
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    if (!(self = [super initWithFrame:frame])) return nil;
+    self.userInteractionEnabled = NO;
+    self.isAccessibilityElement = NO;
+    self.clipsToBounds = YES;
+    _track = [UIView new];
+    _track.backgroundColor = [UIColor colorWithWhite:1 alpha:0.24];
+    _fill = [UIView new];
+    _fill.backgroundColor = UIColor.whiteColor;
+    [self addSubview:_track];
+    [self addSubview:_fill];
+    return self;
+}
+
+- (void)setProgress:(CGFloat)progress thickness:(CGFloat)thickness {
+    _progress = MIN(1, MAX(0, progress));
+    _thickness = MIN(5, MAX(0, thickness));
+    self.hidden = _thickness <= 0;
+    [self setNeedsLayout];
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGFloat horizontalInset = 8;
+    CGFloat width = MAX(0, self.bounds.size.width - horizontalInset * 2);
+    CGFloat fillY = self.bounds.size.height - 3 - _thickness / 2;
+    _track.frame = CGRectMake(horizontalInset, fillY, width, _thickness);
+    _fill.frame = CGRectMake(horizontalInset, fillY, width * _progress, _thickness);
+    _track.layer.cornerRadius = _thickness / 2;
+    _fill.layer.cornerRadius = _thickness / 2;
+}
+@end
+
+static BOOL isProgressLine(UIView *view, UIView *card) {
+    if (view == card || !view.superview) return NO;
+    CGSize size = view.bounds.size;
+    if (size.height <= 0 || size.height > 10 || size.width < MAX(200, card.bounds.size.width * 0.7)) return NO;
+    CGRect frame = [view convertRect:view.bounds toView:card];
+    return CGRectGetMaxY(frame) >= card.bounds.size.height - 14;
+}
+
+static void updateMiniProgress(void) {
+    UIView *line = sg_progressLine;
+    UIView *custom = sg_miniProgressView;
+    if (!custom) return;
+    BOOL transitioning = !SGIsInside(custom, sgr_nowPlayingRoot) || SGPlayerTransitionEnds() > 0;
+    if (line) {
+        NSNumber *originalAlpha = objc_getAssociatedObject(line, &kProgressAlphaKey);
+        BOOL hideOriginal = !transitioning && SGIsInside(line, sgr_nowPlayingRoot);
+        if (originalAlpha) line.alpha = hideOriginal ? 0 : originalAlpha.doubleValue;
+    }
+    custom.hidden = transitioning || progressThickness() <= 0;
+    if (transitioning) return;
+
+    SPTPlayerState *state = SGPlayerState();
+    double position = state.isPaused ? state.positionAsOfTimestamp : state.position;
+    CGFloat progress = state.duration > 0 ? (CGFloat)(position / state.duration) : 0;
+    [(SGRMiniProgressView *)custom setProgress:progress thickness:progressThickness()];
+}
+
+static void ensureMiniProgress(UIView *card) {
+    __block UIView *line = nil;
+    SGForEachView(card, ^(UIView *view) {
+        if (!line && isProgressLine(view, card)) line = view;
+    });
+
+    if (sg_progressLine && sg_progressLine != line) {
+        NSNumber *oldAlpha = objc_getAssociatedObject(sg_progressLine, &kProgressAlphaKey);
+        if (oldAlpha) sg_progressLine.alpha = oldAlpha.doubleValue;
+    }
+    sg_progressLine = line;
+    if (line && !objc_getAssociatedObject(line, &kProgressAlphaKey)) {
+        objc_setAssociatedObject(line, &kProgressAlphaKey, @(line.alpha), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+
+    SGRMiniProgressView *progress = objc_getAssociatedObject(card, &kProgressViewKey);
+    if (!progress) {
+        progress = [[SGRMiniProgressView alloc] initWithFrame:CGRectZero];
+        objc_setAssociatedObject(card, &kProgressViewKey, progress, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (progress.superview != card) [card addSubview:progress];
+    [card bringSubviewToFront:progress];
+    progress.frame = card.bounds;
+    progress.layer.cornerRadius = MIN(kCardRadius, card.bounds.size.height / 2);
+    sg_miniProgressView = progress;
+    updateMiniProgress();
+    if (!sg_progressTimer) {
+        sg_progressTimer = [NSTimer timerWithTimeInterval:0.1 repeats:YES block:^(NSTimer *timer) {
+            updateMiniProgress();
+        }];
+        [NSRunLoop.mainRunLoop addTimer:sg_progressTimer forMode:NSRunLoopCommonModes];
+    }
+}
+
 static void restyleCardContent(UIView *card) {
+    if (!card || !SGIsInside(card, sgr_nowPlayingRoot)) return;
     sg_cardContent = card;
     SGForEachView(card, ^(UIView *v) {
         CGSize size = v.bounds.size;
@@ -78,22 +194,7 @@ static void restyleCardContent(UIView *card) {
         }
         sg_cardArtwork = outer;
     });
-    SGForEachView(card, ^(UIView *v) {
-        CGRect f = v.frame;
-        if (f.size.height > 3 || f.size.width < 200 || v.superview.bounds.size.height < 40) return;
-        NSNumber *originalHeight = objc_getAssociatedObject(v, &kProgressHeightKey);
-        if (!originalHeight) {
-            // Keep Spotify's measured height so switching the option off restores the native line.
-            originalHeight = @(f.size.height);
-            objc_setAssociatedObject(v, &kProgressHeightKey, originalHeight, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        }
-        CGFloat height = SGFlag(SGRKeyNowPlayingThickProgress, NO) ? 2 : originalHeight.doubleValue;
-        CGRect target = CGRectMake(52, card.bounds.size.height - 6, 226, height);
-        if (CGRectEqualToRect(f, target)) return;
-        v.frame = target;
-        [v setNeedsLayout];
-        [v layoutIfNeeded];
-    });
+    ensureMiniProgress(card);
 }
 
 
@@ -298,7 +399,8 @@ static BOOL hasTrack(void) {
 }
 
 void SGRNowPlayingBarRefresh(void) {
-    if (sg_cardContent) restyleCardContent(sg_cardContent);
+    if (sg_cardContent && SGIsInside(sg_cardContent, sgr_nowPlayingRoot)) restyleCardContent(sg_cardContent);
+    updateMiniProgress();
     [sg_mini setNeedsLayout];
     [sg_mini layoutIfNeeded];
     refreshMini();
@@ -443,8 +545,8 @@ static void styleNowPlayingBar(UIViewController *container) {
     CGFloat radius = MIN(kCardRadius, frame.size.height / 2);
     if (card) {
         roundView(card, radius);
-        restyleCardContent(card);
     }
+    restyleCardContent(card ?: bar);
 
     UIVisualEffectView *glass = SGGlassFor(container.view, &kGlassKey);
     if (glass.overrideUserInterfaceStyle != UIUserInterfaceStyleDark) glass.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
@@ -480,6 +582,12 @@ static void styleNowPlayingBar(UIViewController *container) {
 %ctor {
     if (!SGRedesignedUI()) return;
     %init;
+    [NSNotificationCenter.defaultCenter addObserverForName:SGPlayerTransitionNotification
+                                                       object:nil
+                                                       queue:NSOperationQueue.mainQueue
+                                                  usingBlock:^(NSNotification *note) {
+        updateMiniProgress();
+    }];
     sg_miniWatcher = [SGRMiniPlayerWatcher new];
     SGAddPlayerStateObserver(sg_miniWatcher);
     sg_artworkObserver = [NSNotificationCenter.defaultCenter addObserverForName:SGRNowPlayingArtworkDidChangeNotification

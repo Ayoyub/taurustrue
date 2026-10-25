@@ -2,6 +2,8 @@
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Shared/Player/SpeedPitch.h"
+#import "Shared/Lyrics/Lyrics.h"
+#import "Shared/LyricsSources/LyricsSources.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Player.h"
 #import "SGRPlayerMenu.h"
@@ -534,6 +536,80 @@ static SGRPlayerMenuItem *backgroundStyleItem(SGRPlayerMenuTakeover *takeover) {
     return item;
 }
 
+static SGRPlayerMenuItem *lyricsBlurItem(SGRPlayerMenuTakeover *takeover) {
+    __weak SGRPlayerMenuTakeover *weak = takeover;
+    BOOL enabled = SGRPlayerMotionLyricsBlurEnabled();
+    SGRPlayerMenuItem *item = [SGRPlayerMenuItem itemWithTitle:@"Lyrics Background Blur"
+                                                         image:symbol(@"drop.halffull") action:nil];
+    item.key = @"spotifyglass.playerLyricsBlur";
+    item.subtitle = enabled ? @"On" : @"Off";
+    item.disabled = !SGKaraokePlayingTrack().length;
+
+    NSMutableArray<SGRPlayerMenuItem *> *choices = [NSMutableArray arrayWithCapacity:2];
+    for (NSNumber *value in @[@YES, @NO]) {
+        BOOL choiceEnabled = value.boolValue;
+        NSString *title = choiceEnabled ? @"On" : @"Off";
+        SGRPlayerMenuItem *choice = [SGRPlayerMenuItem itemWithTitle:title image:nil action:^{
+            if (!SGKaraokePlayingTrack().length) {
+                SGLog(@"redesign player menu: cannot change lyrics blur without a playing track");
+                return;
+            }
+            SGRPlayerMotionSetLyricsBlurEnabled(choiceEnabled);
+            [weak.card setSubtitle:title forKey:@"spotifyglass.playerLyricsBlur"];
+        }];
+        choice.key = [@"spotifyglass.playerLyricsBlur." stringByAppendingString:title.lowercaseString];
+        [choices addObject:choice];
+    }
+    item.children = choices;
+    return item;
+}
+
+static SGRPlayerMenuItem *lyricsSourceItem(SGRPlayerMenuTakeover *takeover) {
+    __weak SGRPlayerMenuTakeover *weak = takeover;
+    NSArray<SGLyricsProvider *> *providers = SGLyricsAllProviders();
+    NSString *track = SGKaraokePlayingTrack();
+    NSString *selectedKey = SGLyricsProviderForTrack(track);
+    SGLyricsProvider *selectedProvider = SGLyricsProviderFor(selectedKey);
+    SGRPlayerMenuItem *item = [SGRPlayerMenuItem itemWithTitle:@"Lyrics Source"
+                                                         image:symbol(@"text.quote") action:nil];
+    item.key = @"spotifyglass.playerLyricsSource";
+    item.subtitle = selectedProvider.name ?: @"Automatic";
+    item.disabled = !track.length;
+
+    NSMutableArray<SGRPlayerMenuItem *> *choices = [NSMutableArray arrayWithCapacity:providers.count + 1];
+    SGRPlayerMenuItem *automatic = [SGRPlayerMenuItem itemWithTitle:@"Automatic" image:nil action:^{
+        NSString *currentTrack = SGKaraokePlayingTrack();
+        if (!currentTrack.length) {
+            SGLog(@"redesign player menu: cannot change lyrics source without a playing track");
+            return;
+        }
+        SGKaraokeSetProviderForTrack(currentTrack, nil);
+        SGRPlayerLyricsChanged();
+        [weak.card setSubtitle:@"Automatic" forKey:@"spotifyglass.playerLyricsSource"];
+    }];
+    automatic.key = @"spotifyglass.playerLyricsSource.automatic";
+    [choices addObject:automatic];
+
+    for (SGLyricsProvider *provider in providers) {
+        NSString *providerKey = provider.key;
+        NSString *providerName = provider.name;
+        SGRPlayerMenuItem *choice = [SGRPlayerMenuItem itemWithTitle:providerName image:nil action:^{
+            NSString *currentTrack = SGKaraokePlayingTrack();
+            if (!currentTrack.length) {
+                SGLog(@"redesign player menu: cannot change lyrics source without a playing track");
+                return;
+            }
+            SGKaraokeSetProviderForTrack(currentTrack, providerKey);
+            SGRPlayerLyricsChanged();
+            [weak.card setSubtitle:providerName forKey:@"spotifyglass.playerLyricsSource"];
+        }];
+        choice.key = [@"spotifyglass.playerLyricsSource." stringByAppendingString:providerKey];
+        [choices addObject:choice];
+    }
+    item.children = choices;
+    return item;
+}
+
 static NSArray<SGRPlayerMenuSection *> *sectionsFor(SGRPlayerMenuTakeover *t, NSArray<SGRPlayerMenuSpotifyRow *> *rows) {
     NSMutableArray<SGRPlayerMenuItem *> *tiles = [NSMutableArray array], *main = [NSMutableArray array],
                                   *feedback = [NSMutableArray array], *more = [NSMutableArray array],
@@ -561,6 +637,8 @@ static NSArray<SGRPlayerMenuSection *> *sectionsFor(SGRPlayerMenuTakeover *t, NS
     [main addObject:speedAndPitchItem()];
     [main addObject:lockScreenStyleItem(t)];
     [main addObject:backgroundStyleItem(t)];
+    [main addObject:lyricsBlurItem(t)];
+    [main addObject:lyricsSourceItem(t)];
     if (more.count == 1) {
         [feedback addObject:more.firstObject];
     } else if (more.count) {
