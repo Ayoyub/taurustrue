@@ -230,11 +230,11 @@ Redesigned:
     Player/       the redesigned full screen player (Player.h lists its files); its ⋯ opens a menu the way the
                   Music app draws one (PlayerMenu.x, SGRPlayerMenu.m): a pane of glass grown out of the button,
                   Add to playlist, Add to Queue and Share as three tiles across its top, groups of rows under
-                  them, Speed and pitch opening onto Shared/Player's sliders in place, then the star-marked Canvas
-                  Lyrics switch and Background Style's six choices (Still, Colors, Fluid, Animated, Visualiser and Fill),
-                  everything else Spotify
-                  offers under More, and Remove from this playlist last in red. What is in it and what each row
-                  does stay Spotify's: its own sheet still opens, out of sight, and the menu is read off its
+                  them, Speed and pitch opening onto Shared/Player's sliders in place, then Lock Screen Style,
+                  Background Style's six choices (Still, Colors, Fluid, Animated, Visualiser and Fill), per-song
+                  Lyrics Background Blur and Lyrics Source choices, everything else Spotify
+                  offers under More, and Remove from this playlist last in red. Spotify's rows stay Spotify's:
+                  its own sheet still opens, out of sight, and the menu is read off its
                   table, each row placed by the number Spotify's ListRow carries as its identifier and fired
                   through that ListRow; a page Spotify pushes onto the sheet (Share's destinations) shows the
                   sheet, and a sheet with no rows within 4 s is shown as it is. It opens on the rows the last
@@ -248,7 +248,8 @@ Redesigned:
                   unavailable or cannot play.
                   Player settings expose separate opacity sliders for its artwork and Canvas/lyrics blur layers.
                   While lyrics are open over Animated, a control in the lyrics view toggles that track's background blur;
-                  it is on by default and remembered per track. The Mini player section also has an optional thicker
+                  it is on by default and remembered per track. The player's ⋯ menu also offers per-song lyrics blur
+                  and lyrics source choices. The Mini player section also has an optional thicker
                   progress line, off by default, beside its rounded-square album art option.
                   Always on in the redesign.
                   Tested in the simulator against harness/playermenu/

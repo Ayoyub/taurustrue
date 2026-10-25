@@ -3037,6 +3037,10 @@
 > cells on screen exist, and the hidden table is as short as the sheet would have been, so it is made tall
 > enough for all of them for the moment they are read or a row is fired, and put back.
 >
+> **The mod's own rows** are added after Spotify's: Speed and pitch, Lock Screen Style, Background Style,
+> then Lyrics Background Blur and Lyrics Source. The lyrics choices apply to the currently playing song;
+> blur is on by default, and choosing a source refreshes that song's lyrics.
+>
 > **What Spotify then does** is what it always does: it dismisses the sheet and acts (the card goes with the
 > sheet), or pushes a page of its own onto the sheet (Share's destinations, a list of artists) -- the sheet
 > is then shown the way Spotify drew it and the card goes -- or changes the row in place (Lyrics • Off to

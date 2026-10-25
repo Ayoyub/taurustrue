@@ -11,7 +11,7 @@
 #import <objc/runtime.h>
 
 static const CGFloat kCardRadius = 24;
-static char kGlassKey, kProgressHeightKey, kProgressTransformKey;
+static char kGlassKey, kProgressHeightKey, kProgressCenterKey;
 static __weak UIVisualEffectView *sg_cardGlass;
 static __weak UIView *sg_cardArtwork;
 static __weak UIView *sg_cardContent;
@@ -19,6 +19,8 @@ static __weak UIViewController *sg_container;
 static BOOL sg_docked;
 static CGRect sg_dockRow;   // window coordinates
 static __weak UIView *sg_dockHost;
+static CGFloat sg_loggedProgressThickness = -1;
+static BOOL sg_loggedProgressMissing;
 
 CGRect SGRNowPlayingCardFrameIn(UIView *host, CGFloat *radius) {
     UIVisualEffectView *glass = sg_cardGlass;
@@ -63,6 +65,61 @@ static void roundView(UIView *view, CGFloat radius) {
     view.layer.cornerCurve = kCACornerCurveContinuous;
 }
 
+static CGFloat progressThickness(void) {
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    return [defaults objectForKey:SGRKeyNowPlayingProgressThickness]
+        ? MIN(5, MAX(0, [defaults doubleForKey:SGRKeyNowPlayingProgressThickness])) : 2;
+}
+
+static BOOL isProgressLine(UIView *view, UIView *card, CGRect *frameInCard) {
+    if (view == card || !view.superview || view.superview.bounds.size.height < 40) return NO;
+    CGRect bounds = view.bounds;
+    NSNumber *knownHeight = objc_getAssociatedObject(view, &kProgressHeightKey);
+    if ((!knownHeight && (bounds.size.height <= 0 || bounds.size.height > 3))
+        || bounds.size.width < MAX(200, card.bounds.size.width * 0.7)) return NO;
+    CGRect frame = [view convertRect:view.bounds toView:card];
+    if (CGRectGetMaxY(frame) < card.bounds.size.height - 12) return NO;
+    if (frameInCard) *frameInCard = frame;
+    return YES;
+}
+
+static void applyProgressThickness(UIView *view, UIView *card) {
+    CGRect frame;
+    if (!isProgressLine(view, card, &frame)) return;
+
+    NSNumber *originalHeight = objc_getAssociatedObject(view, &kProgressHeightKey);
+    if (!originalHeight) {
+        originalHeight = @(view.bounds.size.height);
+        objc_setAssociatedObject(view, &kProgressHeightKey, originalHeight, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(view, &kProgressCenterKey, [NSValue valueWithCGPoint:view.center], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        SGLog(@"now playing progress: found %@, frame %@", NSStringFromClass(view.class), NSStringFromCGRect(frame));
+    }
+
+    CGFloat desired = progressThickness();
+    CGFloat delta = desired - originalHeight.doubleValue;
+    CGPoint originalCenter = [objc_getAssociatedObject(view, &kProgressCenterKey) CGPointValue];
+    CGRect bounds = view.bounds;
+    bounds.size.height = desired;
+    view.bounds = bounds;
+    view.center = CGPointMake(originalCenter.x, originalCenter.y - delta / 2);
+
+    for (UIView *ancestor = view.superview; ancestor; ancestor = ancestor.superview) {
+        for (NSLayoutConstraint *constraint in ancestor.constraints) {
+            if (constraint.firstItem == view && constraint.firstAttribute == NSLayoutAttributeHeight
+                && !constraint.secondItem && constraint.relation == NSLayoutRelationEqual
+                && fabs(constraint.multiplier - 1) < 0.001) {
+                constraint.constant = desired;
+            }
+        }
+        if (ancestor == card) break;
+    }
+
+    if (fabs(sg_loggedProgressThickness - desired) >= 0.01) {
+        SGLog(@"now playing progress: %@ thickness applied as %.2f pt", NSStringFromClass(view.class), desired);
+        sg_loggedProgressThickness = desired;
+    }
+}
+
 static void restyleCardContent(UIView *card) {
     sg_cardContent = card;
     SGForEachView(card, ^(UIView *v) {
@@ -78,22 +135,19 @@ static void restyleCardContent(UIView *card) {
         }
         sg_cardArtwork = outer;
     });
+    __block BOOL foundProgress = NO;
     SGForEachView(card, ^(UIView *v) {
-        CGSize size = v.bounds.size;
-        if (size.height <= 0 || size.height > 3 || size.width < 200 || v.superview.bounds.size.height < 40) return;
-        NSNumber *originalHeight = objc_getAssociatedObject(v, &kProgressHeightKey);
-        if (!originalHeight) {
-            originalHeight = @(size.height);
-            objc_setAssociatedObject(v, &kProgressHeightKey, originalHeight, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            objc_setAssociatedObject(v, &kProgressTransformKey, [NSValue valueWithCGAffineTransform:v.transform], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        }
-        NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
-        CGFloat height = [defaults objectForKey:SGRKeyNowPlayingProgressThickness]
-            ? MIN(5, MAX(0, [defaults doubleForKey:SGRKeyNowPlayingProgressThickness])) : 2;
-        CGAffineTransform original = [objc_getAssociatedObject(v, &kProgressTransformKey) CGAffineTransformValue];
-        CGFloat scale = originalHeight.doubleValue > 0 ? height / originalHeight.doubleValue : 0;
-        v.transform = CGAffineTransformScale(original, 1, scale);
+        if (!isProgressLine(v, card, NULL)) return;
+        foundProgress = YES;
+        applyProgressThickness(v, card);
     });
+    if (!foundProgress && !sg_loggedProgressMissing) {
+        SGLog(@"now playing progress: no bottom line matched in %@ (%@)", NSStringFromClass(card.class),
+              NSStringFromCGRect(card.bounds));
+        sg_loggedProgressMissing = YES;
+    } else if (foundProgress) {
+        sg_loggedProgressMissing = NO;
+    }
 }
 
 
