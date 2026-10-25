@@ -5,10 +5,11 @@
 #import <stdint.h>
 #import "SGFillClip.h"
 
-// The sharp cover dissolves into the blurred field across this share of its height at each end; the
-// backdrop is the same cover blurred and aligned, so a wide fade reads as progressively stronger blur
-// rather than a hard seam where the crisp square stops.
-static const CGFloat kBackdropBlurRadius = 22.0, kEdgeFade = 0.2;
+// The cover is drawn aspect-fill across the whole frame — the zoom the system's own full-screen
+// artwork uses, cropping the sides — and dissolves into a blur of the same cover drawn with the same
+// fill, so both layers stay one picture at one zoom and the fade only reads as the blur
+// strengthening in from the frame's edges, with no square stopping short of the frame.
+static const CGFloat kBackdropBlurRadius = 34.0, kEdgeFade = 0.2;
 static const int32_t kLoopSeconds = 4, kFramesPerSecond = 24;
 
 static CGColorSpaceRef fillColorSpace(void) {
@@ -79,19 +80,14 @@ static UIColor *fillBackgroundColor(CGImageRef cover) {
     return [UIColor colorWithHue:hue saturation:saturation brightness:brightness alpha:1];
 }
 
-static CGImageRef blurredCoverForFrame(CGImageRef cover, CGFloat radius, CGSize size) CF_RETURNS_RETAINED {
+// The blur is taken straight from the raw cover and left at its own size, so the backdrop can be
+// drawn over the frame with exactly the fill the sharp layer uses and the two stay one picture.
+// CoreImage hands back a picture that already sits upright, so it is drawn plainly, the way
+// Redesigned/Kit's SGRFluid.m draws its blur.
+static CGImageRef blurredCoverForFrame(CGImageRef cover, CGFloat radius) CF_RETURNS_RETAINED {
     CIImage *input = [CIImage imageWithCGImage:cover];
-    CGRect extent = input.extent;
-    CGFloat side = MIN(extent.size.width, extent.size.height);
-    CGRect square = CGRectMake(CGRectGetMidX(extent) - side / 2, CGRectGetMidY(extent) - side / 2, side, side);
-    CIImage *artwork = [input imageByCroppingToRect:square];
-    CGRect artworkExtent = artwork.extent;
-    CGFloat frameHeight = artworkExtent.size.width * size.height / size.width;
-    CGRect outputRect = CGRectMake(artworkExtent.origin.x,
-                                   CGRectGetMidY(artworkExtent) - frameHeight / 2,
-                                   artworkExtent.size.width, frameHeight);
-    CIImage *output = [[artwork imageByClampingToExtent] imageByApplyingGaussianBlurWithSigma:radius];
-    return [fillCIContext() createCGImage:output fromRect:outputRect];
+    CIImage *output = [[input imageByClampingToExtent] imageByApplyingGaussianBlurWithSigma:radius];
+    return [fillCIContext() createCGImage:output fromRect:input.extent];
 }
 
 static void drawFilling(CGContextRef context, CGImageRef image, CGRect rect) {
@@ -104,17 +100,6 @@ static void drawFilling(CGContextRef context, CGImageRef image, CGRect rect) {
                                     drawn.width, drawn.height);
     CGContextSetInterpolationQuality(context, kCGInterpolationHigh);
     CGContextDrawImage(context, destination, image);
-}
-
-static CGImageRef fullFrameLayer(CGImageRef image, CGSize size) CF_RETURNS_RETAINED {
-    CGContextRef context = bitmapContext(size);
-    if (!context) return NULL;
-    CGContextTranslateCTM(context, 0, size.height);
-    CGContextScaleCTM(context, 1, -1);
-    drawFilling(context, image, CGRectMake(0, 0, size.width, size.height));
-    CGImageRef result = CGBitmapContextCreateImage(context);
-    CGContextRelease(context);
-    return result;
 }
 
 static void addRampStop(CGFloat *components, CGFloat *locations, NSUInteger *count, CGFloat location, CGFloat alpha) {
@@ -151,15 +136,14 @@ static void applyRamp(CGContextRef context, CGFloat originY, CGFloat height, CGF
     CGGradientRelease(gradient);
 }
 
-static CGImageRef maskedLayer(CGImageRef image, CGSize size, CGRect artworkRect) CF_RETURNS_RETAINED {
+static CGImageRef maskedLayer(CGImageRef cover, CGSize size) CF_RETURNS_RETAINED {
     CGContextRef context = bitmapContext(size);
     if (!context) return NULL;
     CGContextTranslateCTM(context, 0, size.height);
     CGContextScaleCTM(context, 1, -1);
-    CGContextClipToRect(context, artworkRect);
-    drawFilling(context, image, artworkRect);
-    applyRamp(context, artworkRect.origin.y, artworkRect.size.height, 0, kEdgeFade, YES);
-    applyRamp(context, artworkRect.origin.y, artworkRect.size.height, 1 - kEdgeFade, 1, NO);
+    drawFilling(context, cover, CGRectMake(0, 0, size.width, size.height));
+    applyRamp(context, 0, size.height, 0, kEdgeFade, YES);
+    applyRamp(context, 0, size.height, 1 - kEdgeFade, 1, NO);
     CGImageRef result = CGBitmapContextCreateImage(context);
     CGContextRelease(context);
     return result;
@@ -167,14 +151,13 @@ static CGImageRef maskedLayer(CGImageRef image, CGSize size, CGRect artworkRect)
 
 CGImageRef SGFillClipFrame(CGImageRef cover, CGSize size) {
     if (!cover || size.width < 1 || size.height < 1) return NULL;
-    CGFloat side = MIN(size.width, size.height);
-    CGRect artworkRect = CGRectMake((size.width - side) / 2, (size.height - side) / 2, side, side);
-    CGFloat blurScale = MAX(1.0, (CGFloat)CGImageGetWidth(cover) / 640.0);
+    // The blur is made in the cover's own pixels; its sigma is scaled so the blur the clip shows stays
+    // the same strength whatever the cover's size is against the frame.
+    CGFloat fillScale = MAX(size.width / (CGFloat)CGImageGetWidth(cover), size.height / (CGFloat)CGImageGetHeight(cover));
+    if (!(fillScale > 0)) fillScale = 1.0;
 
-    CGImageRef backdropBlur = blurredCoverForFrame(cover, kBackdropBlurRadius * blurScale, size);
-    CGImageRef backdrop = backdropBlur ? fullFrameLayer(backdropBlur, size) : NULL;
-    if (backdropBlur) CGImageRelease(backdropBlur);
-    CGImageRef foreground = maskedLayer(cover, size, artworkRect);
+    CGImageRef backdrop = blurredCoverForFrame(cover, kBackdropBlurRadius / fillScale);
+    CGImageRef foreground = maskedLayer(cover, size);
     if (!backdrop || !foreground) {
         if (backdrop) CGImageRelease(backdrop);
         if (foreground) CGImageRelease(foreground);
@@ -189,11 +172,14 @@ CGImageRef SGFillClipFrame(CGImageRef cover, CGSize size) {
     }
     CGContextSetFillColorWithColor(context, fillBackgroundColor(cover).CGColor);
     CGContextFillRect(context, CGRectMake(0, 0, size.width, size.height));
+    // CoreImage's output already sits the right way up, so the blur is drawn plainly, the way
+    // Redesigned/Kit's SGRFluid.m draws its blur; only the cover's sharp layer above goes through the
+    // cover's own recipe, which is what has always stood it upright on the phone.
+    drawFilling(context, backdrop, CGRectMake(0, 0, size.width, size.height));
+    CGImageRelease(backdrop);
     CGContextTranslateCTM(context, 0, size.height);
     CGContextScaleCTM(context, 1, -1);
-    CGContextDrawImage(context, CGRectMake(0, 0, size.width, size.height), backdrop);
-    CGImageRelease(backdrop);
-    CGContextDrawImage(context, CGRectMake(0, 0, size.width, size.height), foreground);
+    drawFilling(context, foreground, CGRectMake(0, 0, size.width, size.height));
     CGImageRelease(foreground);
     CGImageRef result = CGBitmapContextCreateImage(context);
     CGContextRelease(context);
