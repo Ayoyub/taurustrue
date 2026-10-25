@@ -247,6 +247,9 @@ Redesigned:
                   user choose Still, Colors, Fluid, Visualiser or Fill, with Fill as the default, for when Canvas is
                   unavailable or cannot play.
                   Player settings expose separate opacity sliders for its artwork and Canvas/lyrics blur layers.
+                  While lyrics are open over Animated, a control in the lyrics view toggles that track's background blur;
+                  it is on by default and remembered per track. The Mini player section also has an optional thicker
+                  progress line, off by default, beside its rounded-square album art option.
                   Always on in the redesign.
                   Tested in the simulator against harness/playermenu/
                   With Sing on and its voice model downloaded (Mod Settings > Karaoke, Redesigned/Lyrics/SingSettings.m,
