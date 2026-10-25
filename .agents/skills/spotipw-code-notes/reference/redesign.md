@@ -2532,8 +2532,9 @@
 ## `Redesigned/NowPlayingBar/NowPlayingBar.x`
 
 **file overview** (was L1)
-> The redesign's now playing bar: the album-coloured card becomes a glass card with round artwork and the
-> progress line under the text. Spotify's own labels, buttons and gestures stay in place.
+> The redesign's now playing bar: the album-coloured card becomes a glass card with round artwork and an
+> independently drawn progress line under the text. Spotify's own labels, buttons and gestures stay in place;
+> its progress line is only hidden while this bar is shown, and is restored when the full-screen player opens.
 >
 > The full screen player morphs the bar's own card and artwork into the cover art. The bar was
 > written to hand itself back to Spotify for that animation, from NowPlaying_ViewPageImpl's
@@ -2867,6 +2868,9 @@
 > The geometry is re-applied on every layout pass of the units, since a new track rebuilds the
 > elements inside them, and it is undone before the player closes: the bar morphs back into a full
 > size cover, which a thumbnail would not match.
+>
+> The lyrics background blur is controlled by the per-song Player setting and the player's ⋯ menu;
+> there is no blur toggle over the cover.
 >
 > With the lines up and the song playing, the controls go after a few seconds untouched and the lines
 > have the player to themselves, the way the Music app leaves its lyrics alone: the header row, the

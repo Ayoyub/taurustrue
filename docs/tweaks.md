@@ -247,9 +247,10 @@ Redesigned:
                   user choose Still, Colors, Fluid, Visualiser or Fill, with Fill as the default, for when Canvas is
                   unavailable or cannot play.
                   Player settings expose separate opacity sliders for its artwork and Canvas/lyrics blur layers.
-                  Lyrics background blur is controlled by the per-song option in Player settings and the player's
-                  ⋯ menu; it is on by default and remembered per track. The Mini player section also has a 0–5 pt
-                  progress-line thickness slider (2 pt by default), beside its rounded-square album art option.
+                  While lyrics are open over Animated, background blur is on by default and remembered per track;
+                  the Player settings and ⋯ menu control it, alongside the per-song lyrics source. The Mini player
+                  section has its own independently drawn progress line with a 0–5 pt thickness slider (2 pt by default), beside its
+                  rounded-square album art option; it does not resize or reuse the full-screen player's progress bar.
                   Always on in the redesign.
                   Tested in the simulator against harness/playermenu/
                   With Sing on and its voice model downloaded (Mod Settings > Karaoke, Redesigned/Lyrics/SingSettings.m,
